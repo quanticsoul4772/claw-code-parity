@@ -1229,11 +1229,6 @@ fn to_pretty_json<T: serde::Serialize>(value: T) -> Result<String, ToolExecution
     serde_json::to_string_pretty(&value).map_err(ToolExecutionError::from)
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn io_to_error(error: std::io::Error) -> ToolExecutionError {
-    ToolExecutionError::Io(error)
-}
-
 #[derive(Debug, Deserialize)]
 struct ReadFileInput {
     path: String,
