@@ -65,13 +65,14 @@ I've been deeply interested in **harness engineering** — studying how agent sy
 
 ## Porting Status
 
-The main source tree is now Python-first.
+The `src/` Python workspace is a **structural analysis tool** for parity auditing — it mirrors the archived TypeScript architecture metadata, not runtime behavior. The Rust implementation in `rust/` is the active runtime.
 
-- `src/` contains the active Python porting workspace
-- `tests/` verifies the current Python workspace
+- `src/` contains the Python parity analysis workspace (command/tool inventories, routing simulation, structural coverage auditing)
+- `tests/` verifies the Python workspace
+- `rust/` contains the active Rust CLI agent implementation
 - the exposed snapshot is no longer part of the tracked repository state
 
-The current Python workspace is not yet a complete one-to-one replacement for the original system, but the primary implementation surface is now Python.
+The Python workspace provides CLI commands for inspecting command/tool inventories, auditing structural coverage, and simulating routing, but does not execute real tools or call any API.
 
 ## Why this rewrite exists
 

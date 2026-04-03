@@ -11,13 +11,30 @@ use api::{
 use plugins::PluginTool;
 use reqwest::blocking::Client;
 use runtime::{
-    edit_file, execute_bash, glob_search, grep_search, load_system_prompt, read_file, write_file,
-    ApiClient, ApiRequest, AssistantEvent, BashCommandInput, ContentBlock, ConversationMessage,
-    ConversationRuntime, GrepSearchInput, MessageRole, PermissionMode, PermissionPolicy,
-    PromptCacheEvent, RuntimeError, Session, ToolError, ToolExecutor,
+    load_system_prompt, ApiClient, ApiRequest, AssistantEvent, ContentBlock, ConversationMessage,
+    ConversationRuntime, MessageRole, PermissionMode, PermissionPolicy, PromptCacheEvent,
+    RuntimeError, Session, ToolError, ToolExecutor,
 };
+use sandbox_types::SandboxConfig;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+
+mod bash;
+pub mod error;
+pub mod file_ops;
+pub mod sandbox;
+
+pub use bash::{execute_bash, BashCommandInput, BashCommandOutput};
+pub use error::ToolExecutionError;
+pub use file_ops::{
+    edit_file, glob_search, grep_search, read_file, write_file, EditFileOutput, GlobSearchOutput,
+    GrepSearchInput, GrepSearchOutput, ReadFileOutput, StructuredPatchHunk, TextFilePayload,
+    WriteFileOutput,
+};
+pub use sandbox::{
+    build_linux_sandbox_command, detect_container_environment, detect_container_environment_from,
+    resolve_sandbox_status, resolve_sandbox_status_for_request,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolManifestEntry {
@@ -192,16 +209,16 @@ impl GlobalToolRegistry {
         Ok(builtin.chain(plugin).collect())
     }
 
-    pub fn execute(&self, name: &str, input: &Value) -> Result<String, String> {
+    pub fn execute(&self, name: &str, input: &Value) -> Result<String, ToolExecutionError> {
         if mvp_tool_specs().iter().any(|spec| spec.name == name) {
             return execute_tool(name, input);
         }
         self.plugin_tools
             .iter()
             .find(|tool| tool.definition().name == name)
-            .ok_or_else(|| format!("unsupported tool: {name}"))?
+            .ok_or_else(|| ToolExecutionError::ToolNotFound(name.to_string()))?
             .execute(input)
-            .map_err(|error| error.to_string())
+            .map_err(|error| ToolExecutionError::External(error.to_string()))
     }
 }
 
@@ -836,7 +853,7 @@ pub fn mvp_tool_specs() -> Vec<ToolSpec> {
     ]
 }
 
-pub fn execute_tool(name: &str, input: &Value) -> Result<String, String> {
+pub fn execute_tool(name: &str, input: &Value) -> Result<String, ToolExecutionError> {
     match name {
         "bash" => from_value::<BashCommandInput>(input).and_then(run_bash),
         "read_file" => from_value::<ReadFileInput>(input).and_then(run_read_file),
@@ -886,12 +903,12 @@ pub fn execute_tool(name: &str, input: &Value) -> Result<String, String> {
         "TestingPermission" => {
             from_value::<TestingPermissionInput>(input).and_then(run_testing_permission)
         }
-        _ => Err(format!("unsupported tool: {name}")),
+        _ => Err(ToolExecutionError::ToolNotFound(name.to_string())),
     }
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_ask_user_question(input: AskUserQuestionInput) -> Result<String, String> {
+fn run_ask_user_question(input: AskUserQuestionInput) -> Result<String, ToolExecutionError> {
     let mut result = json!({
         "question": input.question,
         "status": "pending",
@@ -904,7 +921,7 @@ fn run_ask_user_question(input: AskUserQuestionInput) -> Result<String, String> 
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_task_create(input: TaskCreateInput) -> Result<String, String> {
+fn run_task_create(input: TaskCreateInput) -> Result<String, ToolExecutionError> {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -919,7 +936,7 @@ fn run_task_create(input: TaskCreateInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_task_get(input: TaskIdInput) -> Result<String, String> {
+fn run_task_get(input: TaskIdInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "task_id": input.task_id,
         "status": "unknown",
@@ -927,7 +944,7 @@ fn run_task_get(input: TaskIdInput) -> Result<String, String> {
     }))
 }
 
-fn run_task_list(_input: Value) -> Result<String, String> {
+fn run_task_list(_input: Value) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "tasks": [],
         "message": "No tasks found"
@@ -935,7 +952,7 @@ fn run_task_list(_input: Value) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_task_stop(input: TaskIdInput) -> Result<String, String> {
+fn run_task_stop(input: TaskIdInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "task_id": input.task_id,
         "status": "stopped",
@@ -944,7 +961,7 @@ fn run_task_stop(input: TaskIdInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_task_update(input: TaskUpdateInput) -> Result<String, String> {
+fn run_task_update(input: TaskUpdateInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "task_id": input.task_id,
         "status": "updated",
@@ -953,7 +970,7 @@ fn run_task_update(input: TaskUpdateInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_task_output(input: TaskIdInput) -> Result<String, String> {
+fn run_task_output(input: TaskIdInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "task_id": input.task_id,
         "output": "",
@@ -962,7 +979,7 @@ fn run_task_output(input: TaskIdInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_team_create(input: TeamCreateInput) -> Result<String, String> {
+fn run_team_create(input: TeamCreateInput) -> Result<String, ToolExecutionError> {
     let team_id = format!(
         "team_{:08x}",
         std::time::SystemTime::now()
@@ -979,7 +996,7 @@ fn run_team_create(input: TeamCreateInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_team_delete(input: TeamDeleteInput) -> Result<String, String> {
+fn run_team_delete(input: TeamDeleteInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "team_id": input.team_id,
         "status": "deleted"
@@ -987,7 +1004,7 @@ fn run_team_delete(input: TeamDeleteInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_cron_create(input: CronCreateInput) -> Result<String, String> {
+fn run_cron_create(input: CronCreateInput) -> Result<String, ToolExecutionError> {
     let cron_id = format!(
         "cron_{:08x}",
         std::time::SystemTime::now()
@@ -1005,14 +1022,14 @@ fn run_cron_create(input: CronCreateInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_cron_delete(input: CronDeleteInput) -> Result<String, String> {
+fn run_cron_delete(input: CronDeleteInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "cron_id": input.cron_id,
         "status": "deleted"
     }))
 }
 
-fn run_cron_list(_input: Value) -> Result<String, String> {
+fn run_cron_list(_input: Value) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "crons": [],
         "message": "No scheduled tasks found"
@@ -1020,7 +1037,7 @@ fn run_cron_list(_input: Value) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_lsp(input: LspInput) -> Result<String, String> {
+fn run_lsp(input: LspInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "action": input.action,
         "path": input.path,
@@ -1033,7 +1050,7 @@ fn run_lsp(input: LspInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_list_mcp_resources(input: McpResourceInput) -> Result<String, String> {
+fn run_list_mcp_resources(input: McpResourceInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "server": input.server,
         "resources": [],
@@ -1042,7 +1059,7 @@ fn run_list_mcp_resources(input: McpResourceInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_read_mcp_resource(input: McpResourceInput) -> Result<String, String> {
+fn run_read_mcp_resource(input: McpResourceInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "server": input.server,
         "uri": input.uri,
@@ -1052,7 +1069,7 @@ fn run_read_mcp_resource(input: McpResourceInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_mcp_auth(input: McpAuthInput) -> Result<String, String> {
+fn run_mcp_auth(input: McpAuthInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "server": input.server,
         "status": "auth_required",
@@ -1061,7 +1078,7 @@ fn run_mcp_auth(input: McpAuthInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_remote_trigger(input: RemoteTriggerInput) -> Result<String, String> {
+fn run_remote_trigger(input: RemoteTriggerInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "url": input.url,
         "method": input.method.unwrap_or_else(|| "GET".to_string()),
@@ -1073,7 +1090,7 @@ fn run_remote_trigger(input: RemoteTriggerInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_mcp_tool(input: McpToolInput) -> Result<String, String> {
+fn run_mcp_tool(input: McpToolInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "server": input.server,
         "tool": input.tool,
@@ -1084,124 +1101,132 @@ fn run_mcp_tool(input: McpToolInput) -> Result<String, String> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_testing_permission(input: TestingPermissionInput) -> Result<String, String> {
+fn run_testing_permission(input: TestingPermissionInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "action": input.action,
         "permitted": true,
         "message": "Testing permission tool stub"
     }))
 }
-fn from_value<T: for<'de> Deserialize<'de>>(input: &Value) -> Result<T, String> {
-    serde_json::from_value(input.clone()).map_err(|error| error.to_string())
+fn from_value<T: for<'de> Deserialize<'de>>(input: &Value) -> Result<T, ToolExecutionError> {
+    serde_json::from_value(input.clone()).map_err(ToolExecutionError::from)
 }
 
-fn run_bash(input: BashCommandInput) -> Result<String, String> {
-    serde_json::to_string_pretty(&execute_bash(input).map_err(|error| error.to_string())?)
-        .map_err(|error| error.to_string())
-}
-
-#[allow(clippy::needless_pass_by_value)]
-fn run_read_file(input: ReadFileInput) -> Result<String, String> {
-    to_pretty_json(read_file(&input.path, input.offset, input.limit).map_err(io_to_string)?)
-}
-
-#[allow(clippy::needless_pass_by_value)]
-fn run_write_file(input: WriteFileInput) -> Result<String, String> {
-    to_pretty_json(write_file(&input.path, &input.content).map_err(io_to_string)?)
+fn run_bash(input: BashCommandInput) -> Result<String, ToolExecutionError> {
+    let cwd = std::env::current_dir()?;
+    let sandbox_config = runtime::ConfigLoader::default_for(&cwd)
+        .load()
+        .map_or_else(|_| SandboxConfig::default(), |c| c.sandbox().clone());
+    Ok(serde_json::to_string_pretty(&execute_bash(
+        input,
+        &sandbox_config,
+    )?)?)
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_edit_file(input: EditFileInput) -> Result<String, String> {
-    to_pretty_json(
-        edit_file(
-            &input.path,
-            &input.old_string,
-            &input.new_string,
-            input.replace_all.unwrap_or(false),
-        )
-        .map_err(io_to_string)?,
-    )
+fn run_read_file(input: ReadFileInput) -> Result<String, ToolExecutionError> {
+    Ok(serde_json::to_string_pretty(&read_file(
+        &input.path,
+        input.offset,
+        input.limit,
+    )?)?)
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_glob_search(input: GlobSearchInputValue) -> Result<String, String> {
-    to_pretty_json(glob_search(&input.pattern, input.path.as_deref()).map_err(io_to_string)?)
+fn run_write_file(input: WriteFileInput) -> Result<String, ToolExecutionError> {
+    Ok(serde_json::to_string_pretty(&write_file(
+        &input.path,
+        &input.content,
+    )?)?)
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_grep_search(input: GrepSearchInput) -> Result<String, String> {
-    to_pretty_json(grep_search(&input).map_err(io_to_string)?)
+fn run_edit_file(input: EditFileInput) -> Result<String, ToolExecutionError> {
+    Ok(serde_json::to_string_pretty(&edit_file(
+        &input.path,
+        &input.old_string,
+        &input.new_string,
+        input.replace_all.unwrap_or(false),
+    )?)?)
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_web_fetch(input: WebFetchInput) -> Result<String, String> {
+fn run_glob_search(input: GlobSearchInputValue) -> Result<String, ToolExecutionError> {
+    Ok(serde_json::to_string_pretty(&glob_search(
+        &input.pattern,
+        input.path.as_deref(),
+    )?)?)
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn run_grep_search(input: GrepSearchInput) -> Result<String, ToolExecutionError> {
+    Ok(serde_json::to_string_pretty(&grep_search(&input)?)?)
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn run_web_fetch(input: WebFetchInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_web_fetch(&input)?)
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn run_web_search(input: WebSearchInput) -> Result<String, String> {
+fn run_web_search(input: WebSearchInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_web_search(&input)?)
 }
 
-fn run_todo_write(input: TodoWriteInput) -> Result<String, String> {
+fn run_todo_write(input: TodoWriteInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_todo_write(input)?)
 }
 
-fn run_skill(input: SkillInput) -> Result<String, String> {
+fn run_skill(input: SkillInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_skill(input)?)
 }
 
-fn run_agent(input: AgentInput) -> Result<String, String> {
+fn run_agent(input: AgentInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_agent(input)?)
 }
 
-fn run_tool_search(input: ToolSearchInput) -> Result<String, String> {
+fn run_tool_search(input: ToolSearchInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_tool_search(input))
 }
 
-fn run_notebook_edit(input: NotebookEditInput) -> Result<String, String> {
+fn run_notebook_edit(input: NotebookEditInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_notebook_edit(input)?)
 }
 
-fn run_sleep(input: SleepInput) -> Result<String, String> {
+fn run_sleep(input: SleepInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_sleep(input)?)
 }
 
-fn run_brief(input: BriefInput) -> Result<String, String> {
+fn run_brief(input: BriefInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_brief(input)?)
 }
 
-fn run_config(input: ConfigInput) -> Result<String, String> {
+fn run_config(input: ConfigInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_config(input)?)
 }
 
-fn run_enter_plan_mode(input: EnterPlanModeInput) -> Result<String, String> {
+fn run_enter_plan_mode(input: EnterPlanModeInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_enter_plan_mode(input)?)
 }
 
-fn run_exit_plan_mode(input: ExitPlanModeInput) -> Result<String, String> {
+fn run_exit_plan_mode(input: ExitPlanModeInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_exit_plan_mode(input)?)
 }
 
-fn run_structured_output(input: StructuredOutputInput) -> Result<String, String> {
+fn run_structured_output(input: StructuredOutputInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_structured_output(input)?)
 }
 
-fn run_repl(input: ReplInput) -> Result<String, String> {
+fn run_repl(input: ReplInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_repl(input)?)
 }
 
-fn run_powershell(input: PowerShellInput) -> Result<String, String> {
-    to_pretty_json(execute_powershell(input).map_err(|error| error.to_string())?)
+fn run_powershell(input: PowerShellInput) -> Result<String, ToolExecutionError> {
+    Ok(serde_json::to_string_pretty(&execute_powershell(input)?)?)
 }
 
-fn to_pretty_json<T: serde::Serialize>(value: T) -> Result<String, String> {
-    serde_json::to_string_pretty(&value).map_err(|error| error.to_string())
-}
-
-#[allow(clippy::needless_pass_by_value)]
-fn io_to_string(error: std::io::Error) -> String {
-    error.to_string()
+fn to_pretty_json<T: serde::Serialize>(value: T) -> Result<String, ToolExecutionError> {
+    serde_json::to_string_pretty(&value).map_err(ToolExecutionError::from)
 }
 
 #[derive(Debug, Deserialize)]
@@ -2620,7 +2645,7 @@ impl ToolExecutor for SubagentToolExecutor {
         }
         let value = serde_json::from_str(input)
             .map_err(|error| ToolError::new(format!("invalid tool input JSON: {error}")))?;
-        execute_tool(tool_name, &value).map_err(ToolError::new)
+        execute_tool(tool_name, &value).map_err(|error| ToolError::new(error.to_string()))
     }
 }
 
@@ -3782,7 +3807,7 @@ fn iso8601_timestamp() -> String {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn execute_powershell(input: PowerShellInput) -> std::io::Result<runtime::BashCommandOutput> {
+fn execute_powershell(input: PowerShellInput) -> std::io::Result<BashCommandOutput> {
     let _ = &input.description;
     let shell = detect_powershell_shell()?;
     execute_shell_command(
@@ -3821,7 +3846,7 @@ fn execute_shell_command(
     command: &str,
     timeout: Option<u64>,
     run_in_background: Option<bool>,
-) -> std::io::Result<runtime::BashCommandOutput> {
+) -> std::io::Result<BashCommandOutput> {
     if run_in_background.unwrap_or(false) {
         let child = std::process::Command::new(shell)
             .arg("-NoProfile")
@@ -3832,7 +3857,7 @@ fn execute_shell_command(
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .spawn()?;
-        return Ok(runtime::BashCommandOutput {
+        return Ok(BashCommandOutput {
             stdout: String::new(),
             stderr: String::new(),
             raw_output_path: None,
@@ -3867,7 +3892,7 @@ fn execute_shell_command(
         loop {
             if let Some(status) = child.try_wait()? {
                 let output = child.wait_with_output()?;
-                return Ok(runtime::BashCommandOutput {
+                return Ok(BashCommandOutput {
                     stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
                     stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
                     raw_output_path: None,
@@ -3901,7 +3926,7 @@ Command exceeded timeout of {timeout_ms} ms",
                         stderr.trim_end()
                     )
                 };
-                return Ok(runtime::BashCommandOutput {
+                return Ok(BashCommandOutput {
                     stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
                     stderr,
                     raw_output_path: None,
@@ -3924,7 +3949,7 @@ Command exceeded timeout of {timeout_ms} ms",
     }
 
     let output = process.output()?;
-    Ok(runtime::BashCommandOutput {
+    Ok(BashCommandOutput {
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
         raw_output_path: None,
@@ -4023,7 +4048,11 @@ mod tests {
         SubagentToolExecutor,
     };
     use api::OutputContentBlock;
-    use runtime::{ApiRequest, AssistantEvent, ConversationRuntime, RuntimeError, Session};
+    use runtime::{
+        ApiRequest, AssistantEvent, ConversationRuntime, PermissionMode, PermissionOutcome,
+        PermissionPolicy, PermissionPromptDecision, PermissionPrompter, PermissionRequest,
+        RuntimeError, Session,
+    };
     use serde_json::json;
 
     fn env_lock() -> &'static Mutex<()> {
@@ -5002,9 +5031,8 @@ mod tests {
         assert_eq!(read_past_end_output["file"]["content"], "");
         assert_eq!(read_past_end_output["file"]["startLine"], 4);
 
-        let read_error = execute_tool("read_file", &json!({ "path": "missing.txt" }))
+        execute_tool("read_file", &json!({ "path": "missing.txt" }))
             .expect_err("missing file should fail");
-        assert!(!read_error.is_empty());
 
         let edit_once = execute_tool(
             "edit_file",
@@ -5084,9 +5112,8 @@ mod tests {
             .expect("filename")
             .ends_with("nested/lib.rs"));
 
-        let glob_error = execute_tool("glob_search", &json!({ "pattern": "[" }))
+        execute_tool("glob_search", &json!({ "pattern": "[" }))
             .expect_err("invalid glob should fail");
-        assert!(!glob_error.is_empty());
 
         let grep_content = execute_tool(
             "grep_search",
@@ -5119,12 +5146,11 @@ mod tests {
         let grep_count_output: serde_json::Value = serde_json::from_str(&grep_count).expect("json");
         assert_eq!(grep_count_output["numMatches"], 3);
 
-        let grep_error = execute_tool(
+        execute_tool(
             "grep_search",
             &json!({ "pattern": "(alpha", "path": "nested" }),
         )
         .expect_err("invalid regex should fail");
-        assert!(!grep_error.is_empty());
 
         std::env::set_current_dir(&original_dir).expect("restore cwd");
         let _ = fs::remove_dir_all(root);
@@ -5628,5 +5654,119 @@ printf 'pwsh:%s' "$1"
             )
             .into_bytes()
         }
+    }
+
+    // -- Permission matrix tests --
+
+    struct AllowPrompter;
+
+    impl PermissionPrompter for AllowPrompter {
+        fn decide(&mut self, _request: &PermissionRequest) -> PermissionPromptDecision {
+            PermissionPromptDecision::Allow
+        }
+    }
+
+    #[test]
+    fn permission_matrix_covers_all_tools_and_modes() {
+        let specs = mvp_tool_specs();
+        let modes = [
+            PermissionMode::ReadOnly,
+            PermissionMode::WorkspaceWrite,
+            PermissionMode::DangerFullAccess,
+        ];
+
+        for spec in &specs {
+            for &active_mode in &modes {
+                let policy = PermissionPolicy::new(active_mode)
+                    .with_tool_requirement(spec.name, spec.required_permission);
+                let outcome = policy.authorize(spec.name, "{}", None);
+
+                if active_mode >= spec.required_permission {
+                    assert_eq!(
+                        outcome,
+                        PermissionOutcome::Allow,
+                        "tool '{}' (requires {:?}) should be allowed in {:?} mode",
+                        spec.name,
+                        spec.required_permission,
+                        active_mode
+                    );
+                } else {
+                    assert!(
+                        matches!(outcome, PermissionOutcome::Deny { .. }),
+                        "tool '{}' (requires {:?}) should be denied in {:?} mode",
+                        spec.name,
+                        spec.required_permission,
+                        active_mode
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn permission_matrix_workspace_write_prompts_for_danger_tools() {
+        let danger_tools: Vec<&str> = mvp_tool_specs()
+            .iter()
+            .filter(|s| s.required_permission == PermissionMode::DangerFullAccess)
+            .map(|s| s.name)
+            .collect();
+
+        assert!(
+            !danger_tools.is_empty(),
+            "there should be danger-full-access tools"
+        );
+
+        for &tool_name in &danger_tools {
+            let policy = PermissionPolicy::new(PermissionMode::WorkspaceWrite)
+                .with_tool_requirement(tool_name, PermissionMode::DangerFullAccess);
+            let mut prompter = AllowPrompter;
+            let outcome = policy.authorize(tool_name, "{}", Some(&mut prompter));
+            assert_eq!(
+                outcome,
+                PermissionOutcome::Allow,
+                "danger tool '{}' should be allowed via prompt in WorkspaceWrite mode",
+                tool_name
+            );
+        }
+    }
+
+    // -- Adversarial notebook tests --
+
+    #[test]
+    fn notebook_edit_rejects_invalid_json_ipynb() {
+        let path = temp_path("bad-notebook.ipynb");
+        std::fs::write(&path, "this is not json").expect("write bad notebook");
+        let result = execute_tool(
+            "NotebookEdit",
+            &json!({
+                "notebook_path": path.display().to_string(),
+                "new_source": "print('hello')",
+            }),
+        );
+        let _ = std::fs::remove_file(&path);
+        assert!(result.is_err(), "invalid JSON notebook should return error");
+    }
+
+    #[test]
+    fn notebook_edit_rejects_notebook_without_cells() {
+        let path = temp_path("no-cells.ipynb");
+        std::fs::write(&path, r#"{"metadata":{}}"#).expect("write no-cells notebook");
+        let result = execute_tool(
+            "NotebookEdit",
+            &json!({
+                "notebook_path": path.display().to_string(),
+                "new_source": "print('hello')",
+            }),
+        );
+        let _ = std::fs::remove_file(&path);
+        assert!(
+            result.is_err(),
+            "notebook without cells should return error"
+        );
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("cells") || err.contains("Notebook"),
+            "error should mention cells, got: {err}"
+        );
     }
 }

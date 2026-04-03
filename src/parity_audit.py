@@ -1,3 +1,10 @@
+"""Structural parity auditing.
+
+Compares the Python workspace file structure, command inventory, and
+tool inventory against reference snapshots from the archived TypeScript
+source. Reports coverage ratios and missing targets.
+"""
+
 from __future__ import annotations
 
 import json

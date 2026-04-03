@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::json::JsonValue;
-use crate::sandbox::{FilesystemIsolationMode, SandboxConfig};
+use sandbox_types::{FilesystemIsolationMode, SandboxConfig};
 
 pub const CLAW_SETTINGS_SCHEMA_NAME: &str = "SettingsSchema";
 
@@ -1528,5 +1528,112 @@ mod tests {
         assert!(config.state_for("known", false));
         assert!(config.state_for("missing", true));
         assert!(!config.state_for("missing", false));
+    }
+
+    #[test]
+    fn local_overrides_project_and_user_for_model() {
+        let root = temp_dir();
+        let cwd = root.join("project");
+        let home = root.join("home").join(".claw");
+        fs::create_dir_all(cwd.join(".claw")).expect("project config dir");
+        fs::create_dir_all(&home).expect("home config dir");
+
+        fs::write(home.join("settings.json"), r#"{"model":"user-model"}"#)
+            .expect("write user settings");
+        fs::write(
+            cwd.join(".claw").join("settings.json"),
+            r#"{"model":"project-model"}"#,
+        )
+        .expect("write project settings");
+        fs::write(
+            cwd.join(".claw").join("settings.local.json"),
+            r#"{"model":"local-model"}"#,
+        )
+        .expect("write local settings");
+
+        let loaded = ConfigLoader::new(&cwd, &home)
+            .load()
+            .expect("config should load");
+
+        assert_eq!(loaded.model(), Some("local-model"));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn project_overrides_user_when_no_local() {
+        let root = temp_dir();
+        let cwd = root.join("project");
+        let home = root.join("home").join(".claw");
+        fs::create_dir_all(cwd.join(".claw")).expect("project config dir");
+        fs::create_dir_all(&home).expect("home config dir");
+
+        fs::write(home.join("settings.json"), r#"{"model":"user-model"}"#)
+            .expect("write user settings");
+        fs::write(
+            cwd.join(".claw").join("settings.json"),
+            r#"{"model":"project-model"}"#,
+        )
+        .expect("write project settings");
+
+        let loaded = ConfigLoader::new(&cwd, &home)
+            .load()
+            .expect("config should load");
+
+        assert_eq!(loaded.model(), Some("project-model"));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn deep_merge_combines_env_from_all_sources() {
+        let root = temp_dir();
+        let cwd = root.join("project");
+        let home = root.join("home").join(".claw");
+        fs::create_dir_all(cwd.join(".claw")).expect("project config dir");
+        fs::create_dir_all(&home).expect("home config dir");
+
+        fs::write(home.join("settings.json"), r#"{"env":{"A":"1"}}"#).expect("write user settings");
+        fs::write(
+            cwd.join(".claw").join("settings.json"),
+            r#"{"env":{"B":"2"}}"#,
+        )
+        .expect("write project settings");
+        fs::write(
+            cwd.join(".claw").join("settings.local.json"),
+            r#"{"env":{"C":"3"}}"#,
+        )
+        .expect("write local settings");
+
+        let loaded = ConfigLoader::new(&cwd, &home)
+            .load()
+            .expect("config should load");
+
+        let env = loaded
+            .get("env")
+            .and_then(JsonValue::as_object)
+            .expect("env should be an object");
+        assert_eq!(env.len(), 3, "all three env vars should be merged");
+        assert_eq!(env.get("A").and_then(JsonValue::as_str), Some("1"));
+        assert_eq!(env.get("B").and_then(JsonValue::as_str), Some("2"));
+        assert_eq!(env.get("C").and_then(JsonValue::as_str), Some("3"));
+
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn missing_config_files_load_gracefully() {
+        let root = temp_dir();
+        let cwd = root.join("project");
+        let home = root.join("home").join(".claw");
+        fs::create_dir_all(&cwd).expect("project dir");
+        fs::create_dir_all(&home).expect("home config dir");
+
+        let loaded = ConfigLoader::new(&cwd, &home)
+            .load()
+            .expect("config should load with no files");
+
+        assert!(loaded.loaded_entries().is_empty());
+        assert!(loaded.model().is_none());
+
+        fs::remove_dir_all(root).expect("cleanup");
     }
 }

@@ -93,6 +93,9 @@ enum Scenario {
     GrepChunkAssembly,
     WriteFileAllowed,
     WriteFileDenied,
+    EditFileRoundtrip,
+    BashTimeout,
+    HookPreToolDeny,
 }
 
 impl Scenario {
@@ -103,6 +106,9 @@ impl Scenario {
             "grep_chunk_assembly" => Some(Self::GrepChunkAssembly),
             "write_file_allowed" => Some(Self::WriteFileAllowed),
             "write_file_denied" => Some(Self::WriteFileDenied),
+            "edit_file_roundtrip" => Some(Self::EditFileRoundtrip),
+            "bash_timeout" => Some(Self::BashTimeout),
+            "hook_pre_tool_deny" => Some(Self::HookPreToolDeny),
             _ => None,
         }
     }
@@ -114,6 +120,9 @@ impl Scenario {
             Self::GrepChunkAssembly => "grep_chunk_assembly",
             Self::WriteFileAllowed => "write_file_allowed",
             Self::WriteFileDenied => "write_file_denied",
+            Self::EditFileRoundtrip => "edit_file_roundtrip",
+            Self::BashTimeout => "bash_timeout",
+            Self::HookPreToolDeny => "hook_pre_tool_deny",
         }
     }
 }
@@ -326,6 +335,40 @@ fn build_stream_body(request: &MessageRequest, scenario: Scenario) -> String {
                 &[r#"{"path":"generated/denied.txt","content":"should not exist\n"}"#],
             ),
         },
+        Scenario::EditFileRoundtrip => match latest_tool_result(request) {
+            Some((tool_output, _)) => final_text_sse(&format!(
+                "edit_file roundtrip complete: {}",
+                extract_file_path(&tool_output)
+            )),
+            None => tool_use_sse(
+                "toolu_edit_fixture",
+                "edit_file",
+                &[
+                    r#"{"path":"fixture.txt","old_string":"alpha","new_string":"omega","replace_all":false}"#,
+                ],
+            ),
+        },
+        Scenario::BashTimeout => match latest_tool_result(request) {
+            Some((tool_output, _)) => final_text_sse(&format!(
+                "bash timed out as expected: {}",
+                extract_interrupted(&tool_output)
+            )),
+            None => tool_use_sse(
+                "toolu_bash_timeout",
+                "bash",
+                &[r#"{"command":"sleep 10","timeout":50}"#],
+            ),
+        },
+        Scenario::HookPreToolDeny => match latest_tool_result(request) {
+            Some((tool_output, is_error)) => final_text_sse(&format!(
+                "hook denied tool as expected (is_error={is_error}): {tool_output}"
+            )),
+            None => tool_use_sse(
+                "toolu_hook_deny",
+                "read_file",
+                &[r#"{"path":"fixture.txt"}"#],
+            ),
+        },
     }
 }
 
@@ -389,6 +432,48 @@ fn build_message_response(request: &MessageRequest, scenario: Scenario) -> Messa
                 json!({"path": "generated/denied.txt", "content": "should not exist\n"}),
             ),
         },
+        Scenario::EditFileRoundtrip => match latest_tool_result(request) {
+            Some((tool_output, _)) => text_message_response(
+                "msg_edit_file_final",
+                &format!(
+                    "edit_file roundtrip complete: {}",
+                    extract_file_path(&tool_output)
+                ),
+            ),
+            None => tool_message_response(
+                "msg_edit_file_tool",
+                "toolu_edit_fixture",
+                "edit_file",
+                json!({"path": "fixture.txt", "old_string": "alpha", "new_string": "omega", "replace_all": false}),
+            ),
+        },
+        Scenario::BashTimeout => match latest_tool_result(request) {
+            Some((tool_output, _)) => text_message_response(
+                "msg_bash_timeout_final",
+                &format!(
+                    "bash timed out as expected: {}",
+                    extract_interrupted(&tool_output)
+                ),
+            ),
+            None => tool_message_response(
+                "msg_bash_timeout_tool",
+                "toolu_bash_timeout",
+                "bash",
+                json!({"command": "sleep 10", "timeout": 50}),
+            ),
+        },
+        Scenario::HookPreToolDeny => match latest_tool_result(request) {
+            Some((tool_output, is_error)) => text_message_response(
+                "msg_hook_deny_final",
+                &format!("hook denied tool as expected (is_error={is_error}): {tool_output}"),
+            ),
+            None => tool_message_response(
+                "msg_hook_deny_tool",
+                "toolu_hook_deny",
+                "read_file",
+                json!({"path": "fixture.txt"}),
+            ),
+        },
     }
 }
 
@@ -399,6 +484,9 @@ fn request_id_for(scenario: Scenario) -> &'static str {
         Scenario::GrepChunkAssembly => "req_grep_chunk_assembly",
         Scenario::WriteFileAllowed => "req_write_file_allowed",
         Scenario::WriteFileDenied => "req_write_file_denied",
+        Scenario::EditFileRoundtrip => "req_edit_file_roundtrip",
+        Scenario::BashTimeout => "req_bash_timeout",
+        Scenario::HookPreToolDeny => "req_hook_pre_tool_deny",
     }
 }
 
@@ -709,4 +797,11 @@ fn extract_file_path(tool_output: &str) -> String {
                 .map(ToOwned::to_owned)
         })
         .unwrap_or_else(|| tool_output.trim().to_string())
+}
+
+fn extract_interrupted(tool_output: &str) -> bool {
+    serde_json::from_str::<Value>(tool_output)
+        .ok()
+        .and_then(|value| value.get("interrupted").and_then(Value::as_bool))
+        .unwrap_or(false)
 }

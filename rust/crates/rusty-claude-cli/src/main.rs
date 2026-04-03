@@ -40,14 +40,15 @@ use plugins::{PluginHooks, PluginManager, PluginManagerConfig, PluginRegistry};
 use render::{MarkdownStreamState, Spinner, TerminalRenderer};
 use runtime::{
     clear_oauth_credentials, generate_pkce_pair, generate_state, load_system_prompt,
-    parse_oauth_callback_request_target, resolve_sandbox_status, save_oauth_credentials, ApiClient,
-    ApiRequest, AssistantEvent, CompactionConfig, ConfigLoader, ConfigSource, ContentBlock,
+    parse_oauth_callback_request_target, save_oauth_credentials, ApiClient, ApiRequest,
+    AssistantEvent, CompactionConfig, ConfigLoader, ConfigSource, ContentBlock,
     ConversationMessage, ConversationRuntime, MessageRole, OAuthAuthorizationRequest, OAuthConfig,
     OAuthTokenExchangeRequest, PermissionMode, PermissionPolicy, ProjectContext, PromptCacheEvent,
     ResolvedPermissionMode, RuntimeError, Session, TokenUsage, ToolError, ToolExecutor,
     UsageTracker,
 };
 use serde_json::json;
+use tools::resolve_sandbox_status;
 use tools::GlobalToolRegistry;
 
 const DEFAULT_MODEL: &str = "claude-opus-4-6";
@@ -4983,13 +4984,14 @@ impl ToolExecutor for CliToolExecutor {
                 Ok(output)
             }
             Err(error) => {
+                let error_message = error.to_string();
                 if self.emit_output {
-                    let markdown = format_tool_result(tool_name, &error, true);
+                    let markdown = format_tool_result(tool_name, &error_message, true);
                     self.renderer
                         .stream_markdown(&markdown, &mut io::stdout())
                         .map_err(|stream_error| ToolError::new(stream_error.to_string()))?;
                 }
-                Err(ToolError::new(error))
+                Err(ToolError::new(error_message))
             }
         }
     }

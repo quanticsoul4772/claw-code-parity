@@ -1,11 +1,13 @@
 use std::ffi::OsStr;
-use std::path::Path;
 use std::process::Command;
 
 use serde_json::json;
 
 use crate::{PluginError, PluginHooks, PluginRegistry};
 
+/// Hook lifecycle events. This enum is the canonical definition shared across the workspace.
+/// The `runtime` crate re-exports and extends the hook system with additional context
+/// (permission overrides, abort signals, input modification) in its own `HookRunResult`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HookEvent {
     PreToolUse,
