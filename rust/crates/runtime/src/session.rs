@@ -171,6 +171,7 @@ impl Session {
             }
             Err(_) | Ok(_) => Self::from_jsonl(&contents)?,
         };
+        cleanup_stale_temp_files(path)?;
         Ok(session.with_persistence_path(path.to_path_buf()))
     }
 
@@ -316,18 +317,28 @@ impl Session {
         let mut compaction = None;
         let mut fork = None;
 
-        for (line_number, raw_line) in contents.lines().enumerate() {
+        let all_lines: Vec<&str> = contents.lines().collect();
+        let total_lines = all_lines.len();
+
+        for (line_number, raw_line) in all_lines.iter().enumerate() {
             let line = raw_line.trim();
             if line.is_empty() {
                 continue;
             }
-            let value = JsonValue::parse(line).map_err(|error| {
-                SessionError::Format(format!(
-                    "invalid JSONL record at line {}: {}",
-                    line_number + 1,
-                    error
-                ))
-            })?;
+            let value = match JsonValue::parse(line) {
+                Ok(v) => v,
+                Err(error) => {
+                    if line_number + 1 == total_lines {
+                        // Tolerate a truncated trailing line (crash during append)
+                        break;
+                    }
+                    return Err(SessionError::Format(format!(
+                        "invalid JSONL record at line {}: {}",
+                        line_number + 1,
+                        error
+                    )));
+                }
+            };
             let object = value.as_object().ok_or_else(|| {
                 SessionError::Format(format!(
                     "JSONL record at line {} must be an object",
@@ -922,6 +933,28 @@ fn cleanup_rotated_logs(path: &Path) -> Result<(), SessionError> {
     Ok(())
 }
 
+fn cleanup_stale_temp_files(path: &Path) -> Result<(), SessionError> {
+    let Some(parent) = path.parent() else {
+        return Ok(());
+    };
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("session");
+    let prefix = format!("{file_name}.tmp-");
+    for entry in fs::read_dir(parent)?.filter_map(Result::ok) {
+        if entry
+            .path()
+            .file_name()
+            .and_then(|value| value.to_str())
+            .is_some_and(|name| name.starts_with(&prefix))
+        {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -1235,5 +1268,82 @@ mod tests {
                     })
             })
             .collect()
+    }
+
+    #[test]
+    fn recovers_session_with_truncated_trailing_line() {
+        let _guard = crate::test_env_lock();
+        let path = temp_session_path("truncated-trail");
+        let mut session = Session::new();
+        session
+            .push_user_text("hello")
+            .expect("should push message");
+        session.save_to_path(&path).expect("should save");
+
+        // Simulate crash during append: add a truncated JSON line
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .expect("should open");
+        use std::io::Write;
+        write!(file, r#"{{"type":"message","message":{{"role":"user","#)
+            .expect("should write truncated data");
+        drop(file);
+
+        let restored =
+            Session::load_from_path(&path).expect("should recover despite truncated trailing line");
+        let _ = fs::remove_file(&path);
+
+        assert_eq!(restored.messages.len(), 1);
+        assert_eq!(restored.messages[0].role, MessageRole::User);
+    }
+
+    #[test]
+    fn rejects_corrupted_mid_file_line() {
+        let _guard = crate::test_env_lock();
+        let path = temp_session_path("mid-corrupt");
+        let contents = format!(
+            "{}\n{}\n{}\n",
+            r#"{"type":"session_meta","version":1,"session_id":"s1","created_at_ms":0,"updated_at_ms":0}"#,
+            "CORRUPTED LINE",
+            r#"{"type":"message","message":{"role":"user","blocks":[{"type":"text","text":"hi"}]}}"#,
+        );
+        fs::write(&path, contents).expect("should write test data");
+
+        let error = Session::load_from_path(&path).expect_err("mid-file corruption should fail");
+        let _ = fs::remove_file(&path);
+
+        assert!(
+            error.to_string().contains("invalid JSONL record at line 2"),
+            "error should mention line 2, got: {error}"
+        );
+    }
+
+    #[test]
+    fn cleans_up_stale_temp_files_on_load() {
+        let _guard = crate::test_env_lock();
+        let path = temp_session_path("stale-tmp-cleanup");
+        let session = Session::new();
+        session.save_to_path(&path).expect("should save");
+
+        let file_name = path
+            .file_name()
+            .expect("should have file name")
+            .to_str()
+            .expect("should be utf8");
+        let stale1 = path.with_file_name(format!("{file_name}.tmp-111-0"));
+        let stale2 = path.with_file_name(format!("{file_name}.tmp-222-1"));
+        fs::write(&stale1, "stale data").expect("should write stale 1");
+        fs::write(&stale2, "stale data").expect("should write stale 2");
+
+        assert!(stale1.exists());
+        assert!(stale2.exists());
+
+        let _restored = Session::load_from_path(&path).expect("should load session");
+
+        assert!(!stale1.exists(), "stale temp file 1 should be cleaned up");
+        assert!(!stale2.exists(), "stale temp file 2 should be cleaned up");
+
+        let _ = fs::remove_file(&path);
     }
 }

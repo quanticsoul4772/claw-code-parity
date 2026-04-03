@@ -14,6 +14,7 @@ pub struct OAuthTokenSet {
     pub access_token: String,
     pub refresh_token: Option<String>,
     pub expires_at: Option<u64>,
+    #[serde(default)]
     pub scopes: Vec<String>,
 }
 

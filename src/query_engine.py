@@ -1,3 +1,11 @@
+"""Structural analysis engine for parity reporting.
+
+Renders workspace summaries and command/tool routing reports against
+archived TypeScript source metadata. Does not execute real tools or
+call any API -- all operations are metadata-based simulations for
+parity measurement.
+"""
+
 from __future__ import annotations
 
 import json

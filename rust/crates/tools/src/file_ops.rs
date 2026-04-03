@@ -547,4 +547,54 @@ mod tests {
         .expect("grep should succeed");
         assert!(grep_output.content.unwrap_or_default().contains("hello"));
     }
+
+    #[test]
+    fn read_file_rejects_nonexistent_traversal_path() {
+        let result = read_file("../../nonexistent_dir_12345/secret.txt", None, None);
+        assert!(
+            result.is_err(),
+            "traversal to nonexistent path should return error"
+        );
+    }
+
+    #[test]
+    fn write_file_traversal_resolves_canonically() {
+        let dir = temp_path("write-traversal");
+        std::fs::create_dir_all(dir.join("subdir")).expect("create temp subdirectory");
+        let traversal_path = format!("{}/subdir/../actual.txt", dir.to_string_lossy());
+        let result = write_file(&traversal_path, "test content");
+        assert!(
+            result.is_ok(),
+            "traversal with valid base should succeed: {:?}",
+            result.err()
+        );
+        let output = result.unwrap();
+        assert!(
+            !output.file_path.contains(".."),
+            "resolved path should not contain .., got: {}",
+            output.file_path
+        );
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn grep_search_rejects_invalid_regex() {
+        let result = grep_search(&GrepSearchInput {
+            pattern: String::from("[invalid("),
+            path: None,
+            glob: None,
+            output_mode: None,
+            before: None,
+            after: None,
+            context_short: None,
+            context: None,
+            line_numbers: None,
+            case_insensitive: None,
+            file_type: None,
+            head_limit: None,
+            offset: None,
+            multiline: None,
+        });
+        assert!(result.is_err(), "invalid regex should return error");
+    }
 }

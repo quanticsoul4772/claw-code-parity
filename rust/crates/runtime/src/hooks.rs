@@ -15,6 +15,9 @@ use crate::permissions::PermissionOverride;
 
 pub type HookPermissionDecision = PermissionOverride;
 
+/// Hook lifecycle events. Mirrors `plugins::hooks::HookEvent` — both crates define this
+/// enum independently because `runtime` depends on `plugins` (not vice versa) and the
+/// runtime version adds `as_str()` and integration with the conversation loop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HookEvent {
     PreToolUse,

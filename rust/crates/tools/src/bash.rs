@@ -3,16 +3,13 @@ use std::io;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
+use sandbox_types::{FilesystemIsolationMode, SandboxConfig, SandboxStatus};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command as TokioCommand;
 use tokio::runtime::Builder;
 use tokio::time::timeout;
 
-use crate::sandbox::{
-    build_linux_sandbox_command, resolve_sandbox_status_for_request, FilesystemIsolationMode,
-    SandboxConfig, SandboxStatus,
-};
-use crate::ConfigLoader;
+use crate::sandbox::{build_linux_sandbox_command, resolve_sandbox_status_for_request};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BashCommandInput {
@@ -64,9 +61,12 @@ pub struct BashCommandOutput {
     pub sandbox_status: Option<SandboxStatus>,
 }
 
-pub fn execute_bash(input: BashCommandInput) -> io::Result<BashCommandOutput> {
+pub fn execute_bash(
+    input: BashCommandInput,
+    sandbox_config: &SandboxConfig,
+) -> io::Result<BashCommandOutput> {
     let cwd = env::current_dir()?;
-    let sandbox_status = sandbox_status_for_input(&input, &cwd);
+    let sandbox_status = sandbox_status_for_input(&input, &cwd, sandbox_config);
 
     if input.run_in_background.unwrap_or(false) {
         let mut child = prepare_command(&input.command, &cwd, &sandbox_status, false);
@@ -164,11 +164,11 @@ async fn execute_bash_async(
     })
 }
 
-fn sandbox_status_for_input(input: &BashCommandInput, cwd: &std::path::Path) -> SandboxStatus {
-    let config = ConfigLoader::default_for(cwd).load().map_or_else(
-        |_| SandboxConfig::default(),
-        |runtime_config| runtime_config.sandbox().clone(),
-    );
+fn sandbox_status_for_input(
+    input: &BashCommandInput,
+    cwd: &std::path::Path,
+    config: &SandboxConfig,
+) -> SandboxStatus {
     let request = config.resolve_request(
         input.dangerously_disable_sandbox.map(|disabled| !disabled),
         input.namespace_restrictions,
@@ -241,21 +241,25 @@ fn prepare_sandbox_dirs(cwd: &std::path::Path) {
 #[cfg(test)]
 mod tests {
     use super::{execute_bash, BashCommandInput};
-    use crate::sandbox::FilesystemIsolationMode;
+    use sandbox_types::{FilesystemIsolationMode, SandboxConfig};
 
     #[test]
     fn executes_simple_command() {
-        let output = execute_bash(BashCommandInput {
-            command: String::from("printf 'hello'"),
-            timeout: Some(1_000),
-            description: None,
-            run_in_background: Some(false),
-            dangerously_disable_sandbox: Some(false),
-            namespace_restrictions: Some(false),
-            isolate_network: Some(false),
-            filesystem_mode: Some(FilesystemIsolationMode::WorkspaceOnly),
-            allowed_mounts: None,
-        })
+        let config = SandboxConfig::default();
+        let output = execute_bash(
+            BashCommandInput {
+                command: String::from("printf 'hello'"),
+                timeout: Some(1_000),
+                description: None,
+                run_in_background: Some(false),
+                dangerously_disable_sandbox: Some(false),
+                namespace_restrictions: Some(false),
+                isolate_network: Some(false),
+                filesystem_mode: Some(FilesystemIsolationMode::WorkspaceOnly),
+                allowed_mounts: None,
+            },
+            &config,
+        )
         .expect("bash command should execute");
 
         assert_eq!(output.stdout, "hello");
@@ -265,19 +269,51 @@ mod tests {
 
     #[test]
     fn disables_sandbox_when_requested() {
-        let output = execute_bash(BashCommandInput {
-            command: String::from("printf 'hello'"),
-            timeout: Some(1_000),
-            description: None,
-            run_in_background: Some(false),
-            dangerously_disable_sandbox: Some(true),
-            namespace_restrictions: None,
-            isolate_network: None,
-            filesystem_mode: None,
-            allowed_mounts: None,
-        })
+        let config = SandboxConfig::default();
+        let output = execute_bash(
+            BashCommandInput {
+                command: String::from("printf 'hello'"),
+                timeout: Some(1_000),
+                description: None,
+                run_in_background: Some(false),
+                dangerously_disable_sandbox: Some(true),
+                namespace_restrictions: None,
+                isolate_network: None,
+                filesystem_mode: None,
+                allowed_mounts: None,
+            },
+            &config,
+        )
         .expect("bash command should execute");
 
         assert!(!output.sandbox_status.expect("sandbox status").enabled);
+    }
+
+    #[test]
+    fn empty_command_does_not_panic() {
+        let config = SandboxConfig::default();
+        let result = execute_bash(
+            BashCommandInput {
+                command: String::new(),
+                timeout: Some(2_000),
+                description: None,
+                run_in_background: Some(false),
+                dangerously_disable_sandbox: Some(true),
+                namespace_restrictions: None,
+                isolate_network: None,
+                filesystem_mode: None,
+                allowed_mounts: None,
+            },
+            &config,
+        );
+        // Empty command passed to `sh -lc ""` should succeed with empty output
+        // or fail gracefully. It must not panic.
+        match result {
+            Ok(output) => assert!(
+                output.stdout.is_empty(),
+                "empty command should produce no stdout"
+            ),
+            Err(error) => assert!(!error.to_string().is_empty(), "error should have a message"),
+        }
     }
 }

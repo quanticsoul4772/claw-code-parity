@@ -53,6 +53,28 @@ fn clean_env_cli_reaches_mock_anthropic_service_across_scripted_parity_scenarios
             seed: seed_noop,
             assert: assert_write_file_denied,
         },
+        ScenarioCase {
+            name: "edit_file_roundtrip",
+            permission_mode: "workspace-write",
+            allowed_tools: Some("edit_file"),
+            seed: seed_edit_fixture,
+            assert: assert_edit_file_roundtrip,
+        },
+        ScenarioCase {
+            name: "bash_timeout",
+            permission_mode: "danger-full-access",
+            allowed_tools: Some("bash"),
+            seed: seed_noop,
+            assert: assert_bash_timeout,
+        },
+        #[cfg(unix)]
+        ScenarioCase {
+            name: "hook_pre_tool_deny",
+            permission_mode: "danger-full-access",
+            allowed_tools: Some("read_file"),
+            seed: seed_hook_deny,
+            assert: assert_hook_pre_tool_deny,
+        },
     ];
 
     for case in cases {
@@ -65,11 +87,7 @@ fn clean_env_cli_reaches_mock_anthropic_service_across_scripted_parity_scenarios
     }
 
     let captured = runtime.block_on(server.captured_requests());
-    assert_eq!(
-        captured.len(),
-        9,
-        "five scenarios should produce nine requests"
-    );
+
     assert!(captured
         .iter()
         .all(|request| request.path == "/v1/messages"));
@@ -79,20 +97,26 @@ fn clean_env_cli_reaches_mock_anthropic_service_across_scripted_parity_scenarios
         .iter()
         .map(|request| request.scenario.as_str())
         .collect::<Vec<_>>();
-    assert_eq!(
-        scenarios,
-        vec![
-            "streaming_text",
-            "read_file_roundtrip",
-            "read_file_roundtrip",
-            "grep_chunk_assembly",
-            "grep_chunk_assembly",
-            "write_file_allowed",
-            "write_file_allowed",
-            "write_file_denied",
-            "write_file_denied",
-        ]
-    );
+
+    let mut expected = vec![
+        "streaming_text",
+        "read_file_roundtrip",
+        "read_file_roundtrip",
+        "grep_chunk_assembly",
+        "grep_chunk_assembly",
+        "write_file_allowed",
+        "write_file_allowed",
+        "write_file_denied",
+        "write_file_denied",
+        "edit_file_roundtrip",
+        "edit_file_roundtrip",
+        "bash_timeout",
+        "bash_timeout",
+    ];
+    #[cfg(unix)]
+    expected.extend(["hook_pre_tool_deny", "hook_pre_tool_deny"]);
+
+    assert_eq!(scenarios, expected);
 }
 
 #[derive(Clone, Copy)]
@@ -233,6 +257,85 @@ fn assert_write_file_denied(workspace: &Path, response: &Value) {
         .expect("message text")
         .contains("denied as expected"));
     assert!(!workspace.join("generated").join("denied.txt").exists());
+}
+
+fn seed_edit_fixture(workspace: &Path) {
+    fs::write(
+        workspace.join("fixture.txt"),
+        "alpha beta gamma\nalpha again\n",
+    )
+    .expect("edit fixture should write");
+}
+
+fn assert_edit_file_roundtrip(workspace: &Path, response: &Value) {
+    assert_eq!(response["iterations"], Value::from(2));
+    assert_eq!(
+        response["tool_uses"][0]["name"],
+        Value::String("edit_file".to_string())
+    );
+    assert_eq!(response["tool_results"][0]["is_error"], Value::Bool(false));
+    let contents =
+        fs::read_to_string(workspace.join("fixture.txt")).expect("edited file should exist");
+    assert_eq!(
+        contents, "omega beta gamma\nalpha again\n",
+        "only first occurrence of alpha should be replaced"
+    );
+    assert!(response["message"]
+        .as_str()
+        .expect("message text")
+        .contains("edit_file roundtrip complete"));
+}
+
+fn assert_bash_timeout(_workspace: &Path, response: &Value) {
+    assert_eq!(response["iterations"], Value::from(2));
+    assert_eq!(
+        response["tool_uses"][0]["name"],
+        Value::String("bash".to_string())
+    );
+    assert_eq!(response["tool_results"][0]["is_error"], Value::Bool(false));
+    let tool_output = response["tool_results"][0]["output"]
+        .as_str()
+        .expect("tool output");
+    let parsed: Value =
+        serde_json::from_str(tool_output).expect("tool output should be valid json");
+    assert_eq!(parsed["interrupted"], Value::Bool(true));
+    assert_eq!(
+        parsed["returnCodeInterpretation"],
+        Value::String("timeout".to_string())
+    );
+    assert!(response["message"]
+        .as_str()
+        .expect("message text")
+        .contains("timed out as expected"));
+}
+
+#[cfg(unix)]
+fn seed_hook_deny(workspace: &Path) {
+    fs::write(workspace.join("fixture.txt"), "should not be read\n").expect("fixture should write");
+    let config_dir = workspace.join("config-home").join(".claw");
+    fs::create_dir_all(&config_dir).expect("config dir should exist");
+    fs::write(
+        config_dir.join("settings.json"),
+        r#"{"hooks":{"PreToolUse":[{"command":"echo '{\"decision\":\"block\",\"reason\":\"hook denied\"}'"}]}}"#,
+    )
+    .expect("hook config should write");
+}
+
+#[cfg(unix)]
+fn assert_hook_pre_tool_deny(_workspace: &Path, response: &Value) {
+    assert_eq!(response["iterations"], Value::from(2));
+    assert_eq!(
+        response["tool_uses"][0]["name"],
+        Value::String("read_file".to_string())
+    );
+    assert_eq!(response["tool_results"][0]["is_error"], Value::Bool(true));
+    let tool_output = response["tool_results"][0]["output"]
+        .as_str()
+        .expect("tool output");
+    assert!(
+        tool_output.contains("denied") || tool_output.contains("hook"),
+        "hook denial should be reflected in tool output, got: {tool_output}"
+    );
 }
 
 fn assert_success(output: &Output) {

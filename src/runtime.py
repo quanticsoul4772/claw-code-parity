@@ -1,3 +1,11 @@
+"""Parity analysis runtime model.
+
+Data structures and routing logic that mirror the upstream Claude Code
+runtime topology. PortRuntime routes prompts to archived command/tool
+inventories by token matching for parity measurement. It does not
+execute real commands, call APIs, or manage actual sessions.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

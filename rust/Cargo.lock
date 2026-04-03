@@ -1111,15 +1111,13 @@ dependencies = [
 name = "runtime"
 version = "0.1.0"
 dependencies = [
- "glob",
  "plugins",
- "regex",
+ "sandbox-types",
  "serde",
  "serde_json",
  "sha2",
  "telemetry",
  "tokio",
- "walkdir",
 ]
 
 [[package]]
@@ -1249,6 +1247,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "sandbox-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -1578,12 +1583,16 @@ name = "tools"
 version = "0.1.0"
 dependencies = [
  "api",
+ "glob",
  "plugins",
+ "regex",
  "reqwest",
  "runtime",
+ "sandbox-types",
  "serde",
  "serde_json",
  "tokio",
+ "walkdir",
 ]
 
 [[package]]
