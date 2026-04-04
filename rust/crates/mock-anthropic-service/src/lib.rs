@@ -372,6 +372,7 @@ fn build_stream_body(request: &MessageRequest, scenario: Scenario) -> String {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn build_message_response(request: &MessageRequest, scenario: Scenario) -> MessageResponse {
     match scenario {
         Scenario::StreamingText => text_message_response(

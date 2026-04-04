@@ -964,6 +964,7 @@ mod tests {
     use crate::json::JsonValue;
     use crate::usage::TokenUsage;
     use std::fs;
+    use std::io::Write;
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -1285,7 +1286,6 @@ mod tests {
             .append(true)
             .open(&path)
             .expect("should open");
-        use std::io::Write;
         write!(file, r#"{{"type":"message","message":{{"role":"user","#)
             .expect("should write truncated data");
         drop(file);

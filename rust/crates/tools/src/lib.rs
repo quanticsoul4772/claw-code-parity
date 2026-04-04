@@ -855,60 +855,51 @@ pub fn mvp_tool_specs() -> Vec<ToolSpec> {
 
 pub fn execute_tool(name: &str, input: &Value) -> Result<String, ToolExecutionError> {
     match name {
-        "bash" => from_value::<BashCommandInput>(input).and_then(run_bash),
-        "read_file" => from_value::<ReadFileInput>(input).and_then(run_read_file),
-        "write_file" => from_value::<WriteFileInput>(input).and_then(run_write_file),
-        "edit_file" => from_value::<EditFileInput>(input).and_then(run_edit_file),
-        "glob_search" => from_value::<GlobSearchInputValue>(input).and_then(run_glob_search),
-        "grep_search" => from_value::<GrepSearchInput>(input).and_then(run_grep_search),
-        "WebFetch" => from_value::<WebFetchInput>(input).and_then(run_web_fetch),
-        "WebSearch" => from_value::<WebSearchInput>(input).and_then(run_web_search),
-        "TodoWrite" => from_value::<TodoWriteInput>(input).and_then(run_todo_write),
-        "Skill" => from_value::<SkillInput>(input).and_then(run_skill),
-        "Agent" => from_value::<AgentInput>(input).and_then(run_agent),
-        "ToolSearch" => from_value::<ToolSearchInput>(input).and_then(run_tool_search),
-        "NotebookEdit" => from_value::<NotebookEditInput>(input).and_then(run_notebook_edit),
-        "Sleep" => from_value::<SleepInput>(input).and_then(run_sleep),
-        "SendUserMessage" | "Brief" => from_value::<BriefInput>(input).and_then(run_brief),
-        "Config" => from_value::<ConfigInput>(input).and_then(run_config),
-        "EnterPlanMode" => from_value::<EnterPlanModeInput>(input).and_then(run_enter_plan_mode),
-        "ExitPlanMode" => from_value::<ExitPlanModeInput>(input).and_then(run_exit_plan_mode),
-        "StructuredOutput" => {
-            from_value::<StructuredOutputInput>(input).and_then(run_structured_output)
-        }
-        "REPL" => from_value::<ReplInput>(input).and_then(run_repl),
-        "PowerShell" => from_value::<PowerShellInput>(input).and_then(run_powershell),
-        "AskUserQuestion" => {
-            from_value::<AskUserQuestionInput>(input).and_then(run_ask_user_question)
-        }
-        "TaskCreate" => from_value::<TaskCreateInput>(input).and_then(run_task_create),
-        "TaskGet" => from_value::<TaskIdInput>(input).and_then(run_task_get),
-        "TaskList" => run_task_list(input.clone()),
-        "TaskStop" => from_value::<TaskIdInput>(input).and_then(run_task_stop),
-        "TaskUpdate" => from_value::<TaskUpdateInput>(input).and_then(run_task_update),
-        "TaskOutput" => from_value::<TaskIdInput>(input).and_then(run_task_output),
-        "TeamCreate" => from_value::<TeamCreateInput>(input).and_then(run_team_create),
-        "TeamDelete" => from_value::<TeamDeleteInput>(input).and_then(run_team_delete),
-        "CronCreate" => from_value::<CronCreateInput>(input).and_then(run_cron_create),
-        "CronDelete" => from_value::<CronDeleteInput>(input).and_then(run_cron_delete),
-        "CronList" => run_cron_list(input.clone()),
-        "LSP" => from_value::<LspInput>(input).and_then(run_lsp),
-        "ListMcpResources" => {
-            from_value::<McpResourceInput>(input).and_then(run_list_mcp_resources)
-        }
-        "ReadMcpResource" => from_value::<McpResourceInput>(input).and_then(run_read_mcp_resource),
-        "McpAuth" => from_value::<McpAuthInput>(input).and_then(run_mcp_auth),
-        "RemoteTrigger" => from_value::<RemoteTriggerInput>(input).and_then(run_remote_trigger),
-        "MCP" => from_value::<McpToolInput>(input).and_then(run_mcp_tool),
-        "TestingPermission" => {
-            from_value::<TestingPermissionInput>(input).and_then(run_testing_permission)
-        }
+        "bash" => run_bash(from_value(input)?),
+        "read_file" => run_read_file(&from_value(input)?),
+        "write_file" => run_write_file(&from_value(input)?),
+        "edit_file" => run_edit_file(&from_value(input)?),
+        "glob_search" => run_glob_search(&from_value(input)?),
+        "grep_search" => run_grep_search(&from_value(input)?),
+        "WebFetch" => run_web_fetch(&from_value(input)?),
+        "WebSearch" => run_web_search(&from_value(input)?),
+        "TodoWrite" => run_todo_write(&from_value(input)?),
+        "Skill" => run_skill(&from_value(input)?),
+        "Agent" => run_agent(from_value(input)?),
+        "ToolSearch" => run_tool_search(&from_value(input)?),
+        "NotebookEdit" => run_notebook_edit(&from_value(input)?),
+        "Sleep" => run_sleep(&from_value(input)?),
+        "SendUserMessage" | "Brief" => run_brief(&from_value(input)?),
+        "Config" => run_config(&from_value(input)?),
+        "EnterPlanMode" => run_enter_plan_mode(&from_value(input)?),
+        "ExitPlanMode" => run_exit_plan_mode(&from_value(input)?),
+        "StructuredOutput" => run_structured_output(&from_value(input)?),
+        "REPL" => run_repl(&from_value(input)?),
+        "PowerShell" => run_powershell(&from_value(input)?),
+        "AskUserQuestion" => run_ask_user_question(&from_value(input)?),
+        "TaskCreate" => run_task_create(&from_value(input)?),
+        "TaskGet" => run_task_get(&from_value(input)?),
+        "TaskList" => run_task_list(input),
+        "TaskStop" => run_task_stop(&from_value(input)?),
+        "TaskUpdate" => run_task_update(&from_value(input)?),
+        "TaskOutput" => run_task_output(&from_value(input)?),
+        "TeamCreate" => run_team_create(&from_value(input)?),
+        "TeamDelete" => run_team_delete(&from_value(input)?),
+        "CronCreate" => run_cron_create(&from_value(input)?),
+        "CronDelete" => run_cron_delete(&from_value(input)?),
+        "CronList" => run_cron_list(input),
+        "LSP" => run_lsp(&from_value(input)?),
+        "ListMcpResources" => run_list_mcp_resources(&from_value(input)?),
+        "ReadMcpResource" => run_read_mcp_resource(&from_value(input)?),
+        "McpAuth" => run_mcp_auth(&from_value(input)?),
+        "RemoteTrigger" => run_remote_trigger(&from_value(input)?),
+        "MCP" => run_mcp_tool(&from_value(input)?),
+        "TestingPermission" => run_testing_permission(&from_value(input)?),
         _ => Err(ToolExecutionError::ToolNotFound(name.to_string())),
     }
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_ask_user_question(input: AskUserQuestionInput) -> Result<String, ToolExecutionError> {
+fn run_ask_user_question(input: &AskUserQuestionInput) -> Result<String, ToolExecutionError> {
     let mut result = json!({
         "question": input.question,
         "status": "pending",
@@ -920,8 +911,7 @@ fn run_ask_user_question(input: AskUserQuestionInput) -> Result<String, ToolExec
     to_pretty_json(result)
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_task_create(input: TaskCreateInput) -> Result<String, ToolExecutionError> {
+fn run_task_create(input: &TaskCreateInput) -> Result<String, ToolExecutionError> {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -935,8 +925,7 @@ fn run_task_create(input: TaskCreateInput) -> Result<String, ToolExecutionError>
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_task_get(input: TaskIdInput) -> Result<String, ToolExecutionError> {
+fn run_task_get(input: &TaskIdInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "task_id": input.task_id,
         "status": "unknown",
@@ -944,15 +933,14 @@ fn run_task_get(input: TaskIdInput) -> Result<String, ToolExecutionError> {
     }))
 }
 
-fn run_task_list(_input: Value) -> Result<String, ToolExecutionError> {
+fn run_task_list(_input: &Value) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "tasks": [],
         "message": "No tasks found"
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_task_stop(input: TaskIdInput) -> Result<String, ToolExecutionError> {
+fn run_task_stop(input: &TaskIdInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "task_id": input.task_id,
         "status": "stopped",
@@ -960,8 +948,7 @@ fn run_task_stop(input: TaskIdInput) -> Result<String, ToolExecutionError> {
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_task_update(input: TaskUpdateInput) -> Result<String, ToolExecutionError> {
+fn run_task_update(input: &TaskUpdateInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "task_id": input.task_id,
         "status": "updated",
@@ -969,8 +956,7 @@ fn run_task_update(input: TaskUpdateInput) -> Result<String, ToolExecutionError>
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_task_output(input: TaskIdInput) -> Result<String, ToolExecutionError> {
+fn run_task_output(input: &TaskIdInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "task_id": input.task_id,
         "output": "",
@@ -978,8 +964,7 @@ fn run_task_output(input: TaskIdInput) -> Result<String, ToolExecutionError> {
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_team_create(input: TeamCreateInput) -> Result<String, ToolExecutionError> {
+fn run_team_create(input: &TeamCreateInput) -> Result<String, ToolExecutionError> {
     let team_id = format!(
         "team_{:08x}",
         std::time::SystemTime::now()
@@ -995,16 +980,14 @@ fn run_team_create(input: TeamCreateInput) -> Result<String, ToolExecutionError>
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_team_delete(input: TeamDeleteInput) -> Result<String, ToolExecutionError> {
+fn run_team_delete(input: &TeamDeleteInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "team_id": input.team_id,
         "status": "deleted"
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_cron_create(input: CronCreateInput) -> Result<String, ToolExecutionError> {
+fn run_cron_create(input: &CronCreateInput) -> Result<String, ToolExecutionError> {
     let cron_id = format!(
         "cron_{:08x}",
         std::time::SystemTime::now()
@@ -1021,23 +1004,21 @@ fn run_cron_create(input: CronCreateInput) -> Result<String, ToolExecutionError>
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_cron_delete(input: CronDeleteInput) -> Result<String, ToolExecutionError> {
+fn run_cron_delete(input: &CronDeleteInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "cron_id": input.cron_id,
         "status": "deleted"
     }))
 }
 
-fn run_cron_list(_input: Value) -> Result<String, ToolExecutionError> {
+fn run_cron_list(_input: &Value) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "crons": [],
         "message": "No scheduled tasks found"
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_lsp(input: LspInput) -> Result<String, ToolExecutionError> {
+fn run_lsp(input: &LspInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "action": input.action,
         "path": input.path,
@@ -1049,8 +1030,7 @@ fn run_lsp(input: LspInput) -> Result<String, ToolExecutionError> {
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_list_mcp_resources(input: McpResourceInput) -> Result<String, ToolExecutionError> {
+fn run_list_mcp_resources(input: &McpResourceInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "server": input.server,
         "resources": [],
@@ -1058,8 +1038,7 @@ fn run_list_mcp_resources(input: McpResourceInput) -> Result<String, ToolExecuti
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_read_mcp_resource(input: McpResourceInput) -> Result<String, ToolExecutionError> {
+fn run_read_mcp_resource(input: &McpResourceInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "server": input.server,
         "uri": input.uri,
@@ -1068,8 +1047,7 @@ fn run_read_mcp_resource(input: McpResourceInput) -> Result<String, ToolExecutio
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_mcp_auth(input: McpAuthInput) -> Result<String, ToolExecutionError> {
+fn run_mcp_auth(input: &McpAuthInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "server": input.server,
         "status": "auth_required",
@@ -1077,11 +1055,10 @@ fn run_mcp_auth(input: McpAuthInput) -> Result<String, ToolExecutionError> {
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_remote_trigger(input: RemoteTriggerInput) -> Result<String, ToolExecutionError> {
+fn run_remote_trigger(input: &RemoteTriggerInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "url": input.url,
-        "method": input.method.unwrap_or_else(|| "GET".to_string()),
+        "method": input.method.as_deref().unwrap_or("GET"),
         "headers": input.headers,
         "body": input.body,
         "status": "triggered",
@@ -1089,8 +1066,7 @@ fn run_remote_trigger(input: RemoteTriggerInput) -> Result<String, ToolExecution
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_mcp_tool(input: McpToolInput) -> Result<String, ToolExecutionError> {
+fn run_mcp_tool(input: &McpToolInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "server": input.server,
         "tool": input.tool,
@@ -1100,8 +1076,7 @@ fn run_mcp_tool(input: McpToolInput) -> Result<String, ToolExecutionError> {
     }))
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_testing_permission(input: TestingPermissionInput) -> Result<String, ToolExecutionError> {
+fn run_testing_permission(input: &TestingPermissionInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(json!({
         "action": input.action,
         "permitted": true,
@@ -1123,8 +1098,7 @@ fn run_bash(input: BashCommandInput) -> Result<String, ToolExecutionError> {
     )?)?)
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_read_file(input: ReadFileInput) -> Result<String, ToolExecutionError> {
+fn run_read_file(input: &ReadFileInput) -> Result<String, ToolExecutionError> {
     Ok(serde_json::to_string_pretty(&read_file(
         &input.path,
         input.offset,
@@ -1132,16 +1106,14 @@ fn run_read_file(input: ReadFileInput) -> Result<String, ToolExecutionError> {
     )?)?)
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_write_file(input: WriteFileInput) -> Result<String, ToolExecutionError> {
+fn run_write_file(input: &WriteFileInput) -> Result<String, ToolExecutionError> {
     Ok(serde_json::to_string_pretty(&write_file(
         &input.path,
         &input.content,
     )?)?)
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_edit_file(input: EditFileInput) -> Result<String, ToolExecutionError> {
+fn run_edit_file(input: &EditFileInput) -> Result<String, ToolExecutionError> {
     Ok(serde_json::to_string_pretty(&edit_file(
         &input.path,
         &input.old_string,
@@ -1150,78 +1122,74 @@ fn run_edit_file(input: EditFileInput) -> Result<String, ToolExecutionError> {
     )?)?)
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_glob_search(input: GlobSearchInputValue) -> Result<String, ToolExecutionError> {
+fn run_glob_search(input: &GlobSearchInputValue) -> Result<String, ToolExecutionError> {
     Ok(serde_json::to_string_pretty(&glob_search(
         &input.pattern,
         input.path.as_deref(),
     )?)?)
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_grep_search(input: GrepSearchInput) -> Result<String, ToolExecutionError> {
-    Ok(serde_json::to_string_pretty(&grep_search(&input)?)?)
+fn run_grep_search(input: &GrepSearchInput) -> Result<String, ToolExecutionError> {
+    Ok(serde_json::to_string_pretty(&grep_search(input)?)?)
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_web_fetch(input: WebFetchInput) -> Result<String, ToolExecutionError> {
-    to_pretty_json(execute_web_fetch(&input)?)
+fn run_web_fetch(input: &WebFetchInput) -> Result<String, ToolExecutionError> {
+    to_pretty_json(execute_web_fetch(input)?)
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn run_web_search(input: WebSearchInput) -> Result<String, ToolExecutionError> {
-    to_pretty_json(execute_web_search(&input)?)
+fn run_web_search(input: &WebSearchInput) -> Result<String, ToolExecutionError> {
+    to_pretty_json(execute_web_search(input)?)
 }
 
-fn run_todo_write(input: TodoWriteInput) -> Result<String, ToolExecutionError> {
-    to_pretty_json(execute_todo_write(input)?)
+fn run_todo_write(input: &TodoWriteInput) -> Result<String, ToolExecutionError> {
+    to_pretty_json(execute_todo_write(input.clone())?)
 }
 
-fn run_skill(input: SkillInput) -> Result<String, ToolExecutionError> {
-    to_pretty_json(execute_skill(input)?)
+fn run_skill(input: &SkillInput) -> Result<String, ToolExecutionError> {
+    to_pretty_json(execute_skill(input.clone())?)
 }
 
 fn run_agent(input: AgentInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_agent(input)?)
 }
 
-fn run_tool_search(input: ToolSearchInput) -> Result<String, ToolExecutionError> {
+fn run_tool_search(input: &ToolSearchInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_tool_search(input))
 }
 
-fn run_notebook_edit(input: NotebookEditInput) -> Result<String, ToolExecutionError> {
-    to_pretty_json(execute_notebook_edit(input)?)
+fn run_notebook_edit(input: &NotebookEditInput) -> Result<String, ToolExecutionError> {
+    to_pretty_json(execute_notebook_edit(input.clone())?)
 }
 
-fn run_sleep(input: SleepInput) -> Result<String, ToolExecutionError> {
+fn run_sleep(input: &SleepInput) -> Result<String, ToolExecutionError> {
     to_pretty_json(execute_sleep(input)?)
 }
 
-fn run_brief(input: BriefInput) -> Result<String, ToolExecutionError> {
-    to_pretty_json(execute_brief(input)?)
+fn run_brief(input: &BriefInput) -> Result<String, ToolExecutionError> {
+    to_pretty_json(execute_brief(input.clone())?)
 }
 
-fn run_config(input: ConfigInput) -> Result<String, ToolExecutionError> {
-    to_pretty_json(execute_config(input)?)
+fn run_config(input: &ConfigInput) -> Result<String, ToolExecutionError> {
+    to_pretty_json(execute_config(input.clone())?)
 }
 
-fn run_enter_plan_mode(input: EnterPlanModeInput) -> Result<String, ToolExecutionError> {
-    to_pretty_json(execute_enter_plan_mode(input)?)
+fn run_enter_plan_mode(input: &EnterPlanModeInput) -> Result<String, ToolExecutionError> {
+    to_pretty_json(execute_enter_plan_mode(input.clone())?)
 }
 
-fn run_exit_plan_mode(input: ExitPlanModeInput) -> Result<String, ToolExecutionError> {
-    to_pretty_json(execute_exit_plan_mode(input)?)
+fn run_exit_plan_mode(input: &ExitPlanModeInput) -> Result<String, ToolExecutionError> {
+    to_pretty_json(execute_exit_plan_mode(input.clone())?)
 }
 
-fn run_structured_output(input: StructuredOutputInput) -> Result<String, ToolExecutionError> {
-    to_pretty_json(execute_structured_output(input)?)
+fn run_structured_output(input: &StructuredOutputInput) -> Result<String, ToolExecutionError> {
+    to_pretty_json(execute_structured_output(input.clone())?)
 }
 
-fn run_repl(input: ReplInput) -> Result<String, ToolExecutionError> {
-    to_pretty_json(execute_repl(input)?)
+fn run_repl(input: &ReplInput) -> Result<String, ToolExecutionError> {
+    to_pretty_json(execute_repl(input.clone())?)
 }
 
-fn run_powershell(input: PowerShellInput) -> Result<String, ToolExecutionError> {
+fn run_powershell(input: &PowerShellInput) -> Result<String, ToolExecutionError> {
     Ok(serde_json::to_string_pretty(&execute_powershell(input)?)?)
 }
 
@@ -1229,20 +1197,20 @@ fn to_pretty_json<T: serde::Serialize>(value: T) -> Result<String, ToolExecution
     serde_json::to_string_pretty(&value).map_err(ToolExecutionError::from)
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct ReadFileInput {
     path: String,
     offset: Option<usize>,
     limit: Option<usize>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct WriteFileInput {
     path: String,
     content: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct EditFileInput {
     path: String,
     old_string: String,
@@ -1250,26 +1218,26 @@ struct EditFileInput {
     replace_all: Option<bool>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct GlobSearchInputValue {
     pattern: String,
     path: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct WebFetchInput {
     url: String,
     prompt: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct WebSearchInput {
     query: String,
     allowed_domains: Option<Vec<String>>,
     blocked_domains: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct TodoWriteInput {
     todos: Vec<TodoItem>,
 }
@@ -1290,13 +1258,13 @@ enum TodoStatus {
     Completed,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct SkillInput {
     skill: String,
     args: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct AgentInput {
     description: String,
     prompt: String,
@@ -1305,13 +1273,13 @@ struct AgentInput {
     model: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct ToolSearchInput {
     query: String,
     max_results: Option<usize>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct NotebookEditInput {
     notebook_path: String,
     cell_id: Option<String>,
@@ -1335,40 +1303,40 @@ enum NotebookEditMode {
     Delete,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct SleepInput {
     duration_ms: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct BriefInput {
     message: String,
     attachments: Option<Vec<String>>,
     status: BriefStatus,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum BriefStatus {
     Normal,
     Proactive,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct ConfigInput {
     setting: String,
     value: Option<ConfigValue>,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 struct EnterPlanModeInput {}
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 struct ExitPlanModeInput {}
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 enum ConfigValue {
     String(String),
@@ -1376,18 +1344,18 @@ enum ConfigValue {
     Number(f64),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(transparent)]
 struct StructuredOutputInput(BTreeMap<String, Value>);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct ReplInput {
     code: String,
     language: String,
     timeout_ms: Option<u64>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct PowerShellInput {
     command: String,
     timeout: Option<u64>,
@@ -1395,43 +1363,43 @@ struct PowerShellInput {
     run_in_background: Option<bool>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct AskUserQuestionInput {
     question: String,
     #[serde(default)]
     options: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct TaskCreateInput {
     prompt: String,
     #[serde(default)]
     description: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct TaskIdInput {
     task_id: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct TaskUpdateInput {
     task_id: String,
     message: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct TeamCreateInput {
     name: String,
     tasks: Vec<Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct TeamDeleteInput {
     team_id: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct CronCreateInput {
     schedule: String,
     prompt: String,
@@ -1439,12 +1407,12 @@ struct CronCreateInput {
     description: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct CronDeleteInput {
     cron_id: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct LspInput {
     action: String,
     #[serde(default)]
@@ -1457,7 +1425,7 @@ struct LspInput {
     query: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct McpResourceInput {
     #[serde(default)]
     server: Option<String>,
@@ -1465,12 +1433,12 @@ struct McpResourceInput {
     uri: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct McpAuthInput {
     server: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct RemoteTriggerInput {
     url: String,
     #[serde(default)]
@@ -1481,7 +1449,7 @@ struct RemoteTriggerInput {
     body: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct McpToolInput {
     server: String,
     tool: String,
@@ -1489,7 +1457,7 @@ struct McpToolInput {
     arguments: Option<Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct TestingPermissionInput {
     action: String,
 }
@@ -2323,7 +2291,7 @@ fn build_agent_runtime(
         .clone()
         .unwrap_or_else(|| DEFAULT_AGENT_MODEL.to_string());
     let allowed_tools = job.allowed_tools.clone();
-    let api_client = ProviderRuntimeClient::new(model, allowed_tools.clone())?;
+    let api_client = ProviderRuntimeClient::new(&model, allowed_tools.clone())?;
     let tool_executor = SubagentToolExecutor::new(allowed_tools);
     Ok(ConversationRuntime::new(
         Session::new(),
@@ -2500,9 +2468,8 @@ struct ProviderRuntimeClient {
 }
 
 impl ProviderRuntimeClient {
-    #[allow(clippy::needless_pass_by_value)]
-    fn new(model: String, allowed_tools: BTreeSet<String>) -> Result<Self, String> {
-        let model = resolve_model_alias(&model).clone();
+    fn new(model: &str, allowed_tools: BTreeSet<String>) -> Result<Self, String> {
+        let model = resolve_model_alias(model);
         let client = ProviderClient::from_model(&model).map_err(|error| error.to_string())?;
         Ok(Self {
             runtime: tokio::runtime::Runtime::new().map_err(|error| error.to_string())?,
@@ -2781,8 +2748,7 @@ fn final_assistant_text(summary: &runtime::TurnSummary) -> String {
         .unwrap_or_default()
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn execute_tool_search(input: ToolSearchInput) -> ToolSearchOutput {
+fn execute_tool_search(input: &ToolSearchInput) -> ToolSearchOutput {
     let deferred = deferred_tool_specs();
     let max_results = input.max_results.unwrap_or(5).max(1);
     let query = input.query.trim().to_string();
@@ -3150,8 +3116,7 @@ fn cell_kind(cell: &serde_json::Value) -> Option<NotebookCellType> {
 
 const MAX_SLEEP_DURATION_MS: u64 = 300_000;
 
-#[allow(clippy::needless_pass_by_value)]
-fn execute_sleep(input: SleepInput) -> Result<SleepOutput, String> {
+fn execute_sleep(input: &SleepInput) -> Result<SleepOutput, String> {
     if input.duration_ms > MAX_SLEEP_DURATION_MS {
         return Err(format!(
             "duration_ms {} exceeds maximum allowed sleep of {MAX_SLEEP_DURATION_MS}ms",
@@ -3806,8 +3771,7 @@ fn iso8601_timestamp() -> String {
     iso8601_now()
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn execute_powershell(input: PowerShellInput) -> std::io::Result<BashCommandOutput> {
+fn execute_powershell(input: &PowerShellInput) -> std::io::Result<BashCommandOutput> {
     let _ = &input.description;
     let shell = detect_powershell_shell()?;
     execute_shell_command(
@@ -5724,8 +5688,7 @@ printf 'pwsh:%s' "$1"
             assert_eq!(
                 outcome,
                 PermissionOutcome::Allow,
-                "danger tool '{}' should be allowed via prompt in WorkspaceWrite mode",
-                tool_name
+                "danger tool '{tool_name}' should be allowed via prompt in WorkspaceWrite mode"
             );
         }
     }
