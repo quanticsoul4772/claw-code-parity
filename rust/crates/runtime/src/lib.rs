@@ -8,6 +8,7 @@ mod mcp;
 mod mcp_client;
 mod mcp_stdio;
 mod oauth;
+pub mod parallel_tools;
 mod permissions;
 pub mod progress_tracker;
 mod prompt;
