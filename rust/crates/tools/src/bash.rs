@@ -18,15 +18,19 @@ pub struct BashCommandInput {
     pub description: Option<String>,
     #[serde(rename = "run_in_background")]
     pub run_in_background: Option<bool>,
-    #[serde(rename = "dangerouslyDisableSandbox")]
+
+    // Security-sensitive sandbox fields: these must NOT be controllable by the LLM.
+    // They are skipped during deserialization from tool_use JSON input and can only
+    // be set programmatically (e.g., from CLI flags or SandboxConfig).
+    #[serde(rename = "dangerouslyDisableSandbox", skip_deserializing)]
     pub dangerously_disable_sandbox: Option<bool>,
-    #[serde(rename = "namespaceRestrictions")]
+    #[serde(rename = "namespaceRestrictions", skip_deserializing)]
     pub namespace_restrictions: Option<bool>,
-    #[serde(rename = "isolateNetwork")]
+    #[serde(rename = "isolateNetwork", skip_deserializing)]
     pub isolate_network: Option<bool>,
-    #[serde(rename = "filesystemMode")]
+    #[serde(rename = "filesystemMode", skip_deserializing)]
     pub filesystem_mode: Option<FilesystemIsolationMode>,
-    #[serde(rename = "allowedMounts")]
+    #[serde(rename = "allowedMounts", skip_deserializing)]
     pub allowed_mounts: Option<Vec<String>>,
 }
 
@@ -315,5 +319,45 @@ mod tests {
             ),
             Err(error) => assert!(!error.to_string().is_empty(), "error should have a message"),
         }
+    }
+
+    #[test]
+    fn sandbox_fields_stripped_from_json_deserialization() {
+        // Simulates LLM providing sandbox-override fields in tool_use JSON.
+        // These fields must be ignored during deserialization to prevent
+        // the LLM from bypassing the sandbox.
+        let json_with_sandbox_overrides = serde_json::json!({
+            "command": "echo hello",
+            "dangerouslyDisableSandbox": true,
+            "namespaceRestrictions": false,
+            "isolateNetwork": false,
+            "filesystemMode": "off",
+            "allowedMounts": ["/etc", "/var"]
+        });
+
+        let input: BashCommandInput =
+            serde_json::from_value(json_with_sandbox_overrides).expect("should deserialize");
+
+        assert_eq!(input.command, "echo hello");
+        assert_eq!(
+            input.dangerously_disable_sandbox, None,
+            "dangerouslyDisableSandbox should be stripped from LLM input"
+        );
+        assert_eq!(
+            input.namespace_restrictions, None,
+            "namespaceRestrictions should be stripped from LLM input"
+        );
+        assert_eq!(
+            input.isolate_network, None,
+            "isolateNetwork should be stripped from LLM input"
+        );
+        assert_eq!(
+            input.filesystem_mode, None,
+            "filesystemMode should be stripped from LLM input"
+        );
+        assert_eq!(
+            input.allowed_mounts, None,
+            "allowedMounts should be stripped from LLM input"
+        );
     }
 }

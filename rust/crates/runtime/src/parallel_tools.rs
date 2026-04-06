@@ -1,7 +1,7 @@
 //! Parallel tool execution — classify, partition, and execute safe tools concurrently.
 //!
-//! When Claude returns multiple tool_use blocks in one response, read-only tools
-//! can be executed in parallel via tokio::JoinSet. Write tools must stay sequential.
+//! When Claude returns multiple `tool_use` blocks in one response, read-only tools
+//! can be executed in parallel via `tokio::JoinSet`. Write tools must stay sequential.
 
 use serde::Serialize;
 
@@ -34,8 +34,10 @@ pub fn is_parallel_safe(tool_name: &str) -> bool {
     PARALLEL_SAFE.contains(&tool_name)
 }
 
-/// Partition tool calls into (parallel_safe, must_be_sequential).
+/// Partition tool calls into (`parallel_safe`, `must_be_sequential`).
 /// Order within each group is preserved.
+#[must_use]
+#[allow(clippy::type_complexity)]
 pub fn partition<T>(tools: Vec<(String, T)>) -> (Vec<(String, T)>, Vec<(String, T)>) {
     tools
         .into_iter()

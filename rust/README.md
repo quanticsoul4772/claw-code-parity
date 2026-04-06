@@ -72,13 +72,13 @@ Primary artifacts:
 | Interactive REPL (rustyline) | ✅ |
 | Tool system (bash, read, write, edit, grep, glob) | ✅ |
 | Web tools (search, fetch) | ✅ |
-| Sub-agent orchestration | ✅ |
+| Sub-agent orchestration | 🔧 Partial (tool loop works, allowed-tools enforcement pending) |
 | Todo tracking | ✅ |
 | Notebook editing | ✅ |
 | CLAUDE.md / project memory | ✅ |
 | Config file hierarchy (.claude.json) | ✅ |
 | Permission system | ✅ |
-| MCP server lifecycle | ✅ |
+| MCP server lifecycle | 🔧 Dispatch registered, full lifecycle stub |
 | Session persistence + resume | ✅ |
 | Extended thinking (thinking blocks) | ✅ |
 | Cost tracking + usage display | ✅ |
@@ -88,7 +88,9 @@ Primary artifacts:
 | Slash commands (/status, /compact, /clear, etc.) | ✅ |
 | Hooks (PreToolUse/PostToolUse) | 🔧 Config only |
 | Plugin system | 📋 Planned |
-| Skills registry | 📋 Planned |
+| Skills registry | 🔧 Partial (local SKILL.md loading) |
+
+> **Note**: Feature status indicates CLI functionality. See [PARITY.md](../PARITY.md) for rubric-level assessment with test coverage details.
 
 ## Model Aliases
 

@@ -164,15 +164,21 @@ fn normalize_mounts(mounts: &[String], cwd: &Path) -> Vec<String> {
     let cwd = cwd.to_path_buf();
     mounts
         .iter()
-        .map(|mount| {
+        .filter_map(|mount| {
             let path = PathBuf::from(mount);
-            if path.is_absolute() {
+            let resolved = if path.is_absolute() {
                 path
             } else {
                 cwd.join(path)
+            };
+            // Only allow mounts within the workspace directory to prevent
+            // arbitrary filesystem access via sandbox mount configuration.
+            if resolved.starts_with(&cwd) {
+                Some(resolved.display().to_string())
+            } else {
+                None
             }
         })
-        .map(|path| path.display().to_string())
         .collect()
 }
 
@@ -260,5 +266,37 @@ mod tests {
             assert!(launcher.args.iter().any(|arg| arg == "--mount"));
             assert!(launcher.args.iter().any(|arg| arg == "--net") == status.network_active);
         }
+    }
+
+    #[test]
+    fn normalize_mounts_rejects_paths_outside_workspace() {
+        use super::normalize_mounts;
+
+        let workspace = Path::new("/home/user/project");
+        let mounts = vec![
+            "subdir".to_string(),                  // relative — within workspace
+            "/home/user/project/logs".to_string(), // absolute — within workspace
+            "/etc".to_string(),                    // absolute — outside workspace
+            "/var/log".to_string(),                // absolute — outside workspace
+            "../sibling".to_string(),              // relative — resolves outside workspace
+        ];
+
+        let normalized = normalize_mounts(&mounts, workspace);
+
+        // Only workspace-internal mounts should be allowed
+        assert!(
+            normalized
+                .iter()
+                .all(|m| m.starts_with("/home/user/project")),
+            "all mounts should be within workspace, got: {normalized:?}"
+        );
+        assert!(
+            !normalized.iter().any(|m| m.starts_with("/etc")),
+            "/etc should be rejected"
+        );
+        assert!(
+            !normalized.iter().any(|m| m.starts_with("/var")),
+            "/var should be rejected"
+        );
     }
 }

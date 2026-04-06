@@ -1,3 +1,7 @@
 target/
 .omx/
+.omc/
 .clawd-agents/
+.clawd-todos.json
+.sandbox-home/
+.sandbox-tmp/

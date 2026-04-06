@@ -301,6 +301,12 @@ impl PluginTool {
         self.required_permission.as_str()
     }
 
+    /// Returns the raw permission enum for type-safe conversion.
+    #[must_use]
+    pub fn permission_level(&self) -> PluginToolPermission {
+        self.required_permission
+    }
+
     pub fn execute(&self, input: &Value) -> Result<String, PluginError> {
         let input_json = input.to_string();
         let mut process = Command::new(&self.command);

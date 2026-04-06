@@ -96,6 +96,13 @@ enum Scenario {
     EditFileRoundtrip,
     BashTimeout,
     HookPreToolDeny,
+    // Phase 3 additions
+    GlobSearchReadonly,
+    EditFileDeniedReadonly,
+    BashDeniedReadonly,
+    ReadFileNotFound,
+    EditFileOldStringMissing,
+    WriteFileOverwrite,
 }
 
 impl Scenario {
@@ -109,6 +116,12 @@ impl Scenario {
             "edit_file_roundtrip" => Some(Self::EditFileRoundtrip),
             "bash_timeout" => Some(Self::BashTimeout),
             "hook_pre_tool_deny" => Some(Self::HookPreToolDeny),
+            "glob_search_readonly" => Some(Self::GlobSearchReadonly),
+            "edit_file_denied_readonly" => Some(Self::EditFileDeniedReadonly),
+            "bash_denied_readonly" => Some(Self::BashDeniedReadonly),
+            "read_file_not_found" => Some(Self::ReadFileNotFound),
+            "edit_file_old_string_missing" => Some(Self::EditFileOldStringMissing),
+            "write_file_overwrite" => Some(Self::WriteFileOverwrite),
             _ => None,
         }
     }
@@ -123,6 +136,12 @@ impl Scenario {
             Self::EditFileRoundtrip => "edit_file_roundtrip",
             Self::BashTimeout => "bash_timeout",
             Self::HookPreToolDeny => "hook_pre_tool_deny",
+            Self::GlobSearchReadonly => "glob_search_readonly",
+            Self::EditFileDeniedReadonly => "edit_file_denied_readonly",
+            Self::BashDeniedReadonly => "bash_denied_readonly",
+            Self::ReadFileNotFound => "read_file_not_found",
+            Self::EditFileOldStringMissing => "edit_file_old_string_missing",
+            Self::WriteFileOverwrite => "write_file_overwrite",
         }
     }
 }
@@ -285,6 +304,7 @@ fn build_http_response(request: &MessageRequest, scenario: Scenario) -> String {
     )
 }
 
+#[allow(clippy::too_many_lines)]
 fn build_stream_body(request: &MessageRequest, scenario: Scenario) -> String {
     match scenario {
         Scenario::StreamingText => streaming_text_sse(),
@@ -367,6 +387,72 @@ fn build_stream_body(request: &MessageRequest, scenario: Scenario) -> String {
                 "toolu_hook_deny",
                 "read_file",
                 &[r#"{"path":"fixture.txt"}"#],
+            ),
+        },
+        Scenario::GlobSearchReadonly => match latest_tool_result(request) {
+            Some((tool_output, _)) => final_text_sse(&format!(
+                "glob_search completed: {}",
+                extract_num_files(&tool_output)
+            )),
+            None => tool_use_sse(
+                "toolu_glob_readonly",
+                "glob_search",
+                &[r#"{"pattern":"*.txt"}"#],
+            ),
+        },
+        Scenario::EditFileDeniedReadonly => match latest_tool_result(request) {
+            Some((tool_output, _)) => {
+                final_text_sse(&format!("edit_file denied as expected: {tool_output}"))
+            }
+            None => tool_use_sse(
+                "toolu_edit_denied",
+                "edit_file",
+                &[
+                    r#"{"path":"fixture.txt","old_string":"alpha","new_string":"omega","replace_all":false}"#,
+                ],
+            ),
+        },
+        Scenario::BashDeniedReadonly => match latest_tool_result(request) {
+            Some((tool_output, _)) => {
+                final_text_sse(&format!("bash denied as expected: {tool_output}"))
+            }
+            None => tool_use_sse(
+                "toolu_bash_denied",
+                "bash",
+                &[r#"{"command":"echo hello"}"#],
+            ),
+        },
+        Scenario::ReadFileNotFound => match latest_tool_result(request) {
+            Some((tool_output, _)) => {
+                final_text_sse(&format!("read_file error as expected: {tool_output}"))
+            }
+            None => tool_use_sse(
+                "toolu_read_missing",
+                "read_file",
+                &[r#"{"path":"nonexistent_file_12345.txt"}"#],
+            ),
+        },
+        Scenario::EditFileOldStringMissing => match latest_tool_result(request) {
+            Some((tool_output, _)) => {
+                final_text_sse(&format!("edit_file error as expected: {tool_output}"))
+            }
+            None => tool_use_sse(
+                "toolu_edit_missing_str",
+                "edit_file",
+                &[
+                    r#"{"path":"fixture.txt","old_string":"DOES_NOT_EXIST_XYZ","new_string":"replacement","replace_all":false}"#,
+                ],
+            ),
+        },
+        Scenario::WriteFileOverwrite => match latest_tool_result(request) {
+            Some((tool_output, _)) => final_text_sse(&format!(
+                "write_file overwrite complete: {}",
+                extract_file_path(&tool_output)
+            )),
+            None => tool_use_sse(
+                "toolu_write_overwrite",
+                "write_file",
+                &[r#"{"path":"fixture.txt","content":"overwritten content\n"}"#],
             ),
         },
     }
@@ -475,6 +561,81 @@ fn build_message_response(request: &MessageRequest, scenario: Scenario) -> Messa
                 json!({"path": "fixture.txt"}),
             ),
         },
+        Scenario::GlobSearchReadonly => match latest_tool_result(request) {
+            Some((tool_output, _)) => text_message_response(
+                "msg_glob_readonly_final",
+                &format!("glob_search completed: {}", extract_num_files(&tool_output)),
+            ),
+            None => tool_message_response(
+                "msg_glob_readonly_tool",
+                "toolu_glob_readonly",
+                "glob_search",
+                json!({"pattern": "*.txt"}),
+            ),
+        },
+        Scenario::EditFileDeniedReadonly => match latest_tool_result(request) {
+            Some((tool_output, _)) => text_message_response(
+                "msg_edit_denied_final",
+                &format!("edit_file denied as expected: {tool_output}"),
+            ),
+            None => tool_message_response(
+                "msg_edit_denied_tool",
+                "toolu_edit_denied",
+                "edit_file",
+                json!({"path": "fixture.txt", "old_string": "alpha", "new_string": "omega", "replace_all": false}),
+            ),
+        },
+        Scenario::BashDeniedReadonly => match latest_tool_result(request) {
+            Some((tool_output, _)) => text_message_response(
+                "msg_bash_denied_final",
+                &format!("bash denied as expected: {tool_output}"),
+            ),
+            None => tool_message_response(
+                "msg_bash_denied_tool",
+                "toolu_bash_denied",
+                "bash",
+                json!({"command": "echo hello"}),
+            ),
+        },
+        Scenario::ReadFileNotFound => match latest_tool_result(request) {
+            Some((tool_output, _)) => text_message_response(
+                "msg_read_not_found_final",
+                &format!("read_file error as expected: {tool_output}"),
+            ),
+            None => tool_message_response(
+                "msg_read_not_found_tool",
+                "toolu_read_missing",
+                "read_file",
+                json!({"path": "nonexistent_file_12345.txt"}),
+            ),
+        },
+        Scenario::EditFileOldStringMissing => match latest_tool_result(request) {
+            Some((tool_output, _)) => text_message_response(
+                "msg_edit_missing_str_final",
+                &format!("edit_file error as expected: {tool_output}"),
+            ),
+            None => tool_message_response(
+                "msg_edit_missing_str_tool",
+                "toolu_edit_missing_str",
+                "edit_file",
+                json!({"path": "fixture.txt", "old_string": "DOES_NOT_EXIST_XYZ", "new_string": "replacement", "replace_all": false}),
+            ),
+        },
+        Scenario::WriteFileOverwrite => match latest_tool_result(request) {
+            Some((tool_output, _)) => text_message_response(
+                "msg_write_overwrite_final",
+                &format!(
+                    "write_file overwrite complete: {}",
+                    extract_file_path(&tool_output)
+                ),
+            ),
+            None => tool_message_response(
+                "msg_write_overwrite_tool",
+                "toolu_write_overwrite",
+                "write_file",
+                json!({"path": "fixture.txt", "content": "overwritten content\n"}),
+            ),
+        },
     }
 }
 
@@ -488,6 +649,12 @@ fn request_id_for(scenario: Scenario) -> &'static str {
         Scenario::EditFileRoundtrip => "req_edit_file_roundtrip",
         Scenario::BashTimeout => "req_bash_timeout",
         Scenario::HookPreToolDeny => "req_hook_pre_tool_deny",
+        Scenario::GlobSearchReadonly => "req_glob_search_readonly",
+        Scenario::EditFileDeniedReadonly => "req_edit_file_denied_readonly",
+        Scenario::BashDeniedReadonly => "req_bash_denied_readonly",
+        Scenario::ReadFileNotFound => "req_read_file_not_found",
+        Scenario::EditFileOldStringMissing => "req_edit_file_old_string_missing",
+        Scenario::WriteFileOverwrite => "req_write_file_overwrite",
     }
 }
 
@@ -798,6 +965,14 @@ fn extract_file_path(tool_output: &str) -> String {
                 .map(ToOwned::to_owned)
         })
         .unwrap_or_else(|| tool_output.trim().to_string())
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn extract_num_files(tool_output: &str) -> usize {
+    serde_json::from_str::<Value>(tool_output)
+        .ok()
+        .and_then(|value| value.get("numFiles").and_then(Value::as_u64))
+        .unwrap_or(0) as usize
 }
 
 fn extract_interrupted(tool_output: &str) -> bool {
