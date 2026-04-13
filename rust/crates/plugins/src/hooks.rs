@@ -347,7 +347,8 @@ impl CommandWithStdin {
             // we finish writing. Propagating BrokenPipe as an error incorrectly
             // marks a successful hook run as a failure.
             match child_stdin.write_all(stdin) {
-                Ok(()) | Err(ref e) if e.kind() == std::io::ErrorKind::BrokenPipe => {}
+                Ok(()) => {}
+                Err(ref e) if e.kind() == std::io::ErrorKind::BrokenPipe => {}
                 Err(e) => return Err(e),
             }
         }
