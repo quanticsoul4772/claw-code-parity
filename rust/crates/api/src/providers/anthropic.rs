@@ -445,16 +445,14 @@ impl AnthropicClient {
 
         Err(ApiError::RetriesExhausted {
             attempts,
-            last_error: Box::new(last_error.unwrap_or_else(|| {
-                ApiError::Api {
-                    status: reqwest::StatusCode::INTERNAL_SERVER_ERROR,
-                    error_type: Some(String::from("internal")),
-                    message: Some(String::from(
-                        "retry loop exhausted without capturing an error",
-                    )),
-                    body: String::new(),
-                    retryable: false,
-                }
+            last_error: Box::new(last_error.unwrap_or_else(|| ApiError::Api {
+                status: reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+                error_type: Some(String::from("internal")),
+                message: Some(String::from(
+                    "retry loop exhausted without capturing an error",
+                )),
+                body: String::new(),
+                retryable: false,
             })),
         })
     }
