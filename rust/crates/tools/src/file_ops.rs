@@ -578,6 +578,71 @@ mod tests {
     }
 
     #[test]
+    fn read_file_with_dotdot_traversal_resolves_canonically() {
+        let dir = temp_path("read-traversal");
+        std::fs::create_dir_all(dir.join("subdir")).expect("create temp subdirectory");
+        let file = dir.join("target.txt");
+        write_file(file.to_string_lossy().as_ref(), "traversal content")
+            .expect("setup file for traversal test");
+        let traversal_path = format!("{}/subdir/../target.txt", dir.to_string_lossy());
+        let result = read_file(&traversal_path, None, None);
+        assert!(
+            result.is_ok(),
+            "dotdot traversal to existing file should resolve: {:?}",
+            result.err()
+        );
+        let output = result.unwrap();
+        assert!(
+            output.file.content.contains("traversal content"),
+            "should read the correct file content"
+        );
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn read_file_absolute_path_works() {
+        let path = temp_path("abs-read.txt");
+        write_file(path.to_string_lossy().as_ref(), "absolute content")
+            .expect("setup file for absolute path test");
+        let abs_path = path
+            .canonicalize()
+            .expect("canonicalize should succeed for existing file");
+        let result = read_file(abs_path.to_string_lossy().as_ref(), None, None);
+        assert!(
+            result.is_ok(),
+            "absolute path read should succeed: {:?}",
+            result.err()
+        );
+        let output = result.unwrap();
+        assert!(output.file.content.contains("absolute content"));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn edit_file_rejects_nonexistent_path() {
+        let path = temp_path("nonexistent-edit-target.txt");
+        let result = edit_file(path.to_string_lossy().as_ref(), "old", "new", false);
+        assert!(
+            result.is_err(),
+            "editing a nonexistent file should return error"
+        );
+    }
+
+    #[test]
+    fn write_file_to_deep_nonexistent_directory_creates_parents() {
+        let dir = temp_path("deep-write");
+        let deep_path = dir.join("a").join("b").join("c").join("file.txt");
+        let result = write_file(deep_path.to_string_lossy().as_ref(), "deep content");
+        assert!(
+            result.is_ok(),
+            "write to deep nonexistent path should create parents: {:?}",
+            result.err()
+        );
+        assert!(deep_path.exists(), "file should exist after deep write");
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
     fn grep_search_rejects_invalid_regex() {
         let result = grep_search(&GrepSearchInput {
             pattern: String::from("[invalid("),

@@ -42,7 +42,13 @@ python3 -m unittest discover -s tests -v  # run all Python tests
 
 ### CI
 
-GitHub Actions runs `cargo fmt --all --check` and `cargo test -p rusty-claude-cli` on pushes to `main`, `gaebal/**`, and `omx-issue-*` branches (only when `rust/` files change).
+GitHub Actions runs these jobs on pushes to `main`, `feature/**`, `gaebal/**`, and `omx-issue-*` branches (only when `rust/` files change):
+
+- `cargo fmt --all --check` — formatting
+- `cargo clippy --workspace --all-targets -- -D warnings` — linting
+- `cargo test --workspace` — all tests
+- `cargo audit` — dependency vulnerability scanning (non-blocking)
+- `cargo tarpaulin --workspace` — coverage report (uploaded as artifact)
 
 ## Rust Workspace Architecture
 

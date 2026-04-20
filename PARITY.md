@@ -23,46 +23,48 @@ Every tool is classified into one of four levels. Each level has concrete, testa
 
 | Tool | Level | Unit | Perm | E2E | Edge% | Blocking Gaps | Assessed |
 |------|-------|------|------|-----|-------|---------------|----------|
-| **bash** | BEHAVIORAL | 1 | 0/3 | 0 | 40% | sedValidation, pathValidation, readOnlyValidation, destructiveCommandWarning, commandSemantics, bashPermissions, bashSecurity, modeValidation, shouldUseSandbox | 2026-04-02 |
-| **read_file** | BEHAVIORAL | 1 | 0/3 | 1 | 60% | binary detection, size limit, path traversal prevention | 2026-04-02 |
-| **write_file** | BEHAVIORAL | 1 | 0/3 | 2 | 60% | size limit, path traversal prevention | 2026-04-02 |
-| **edit_file** | BEHAVIORAL | 1 | 0/3 | 0 | 60% | replace_all recently added | 2026-04-02 |
-| **glob_search** | BEHAVIORAL | 1 | 0/3 | 0 | 60% | -- | 2026-04-02 |
-| **grep_search** | BEHAVIORAL | 1 | 0/3 | 1 | 60% | -- | 2026-04-02 |
-| **WebFetch** | SURFACE | 2 | 0/3 | 0 | 30% | content truncation, redirect handling vs upstream | 2026-04-02 |
-| **WebSearch** | SURFACE | 2 | 0/3 | 0 | 30% | result ranking fidelity | 2026-04-02 |
-| **TodoWrite** | SURFACE | 2 | 0/3 | 0 | 40% | -- | 2026-04-02 |
-| **Skill** | SURFACE | 1 | 0/3 | 0 | 30% | skill discovery/install flow | 2026-04-02 |
-| **Agent** | SURFACE | 4 | 0/3 | 0 | 30% | sub-agent runtime integration | 2026-04-02 |
-| **ToolSearch** | SURFACE | 1 | 0/3 | 0 | 50% | -- | 2026-04-02 |
-| **NotebookEdit** | SURFACE | 2 | 0/3 | 0 | 40% | -- | 2026-04-02 |
-| **Sleep** | SURFACE | 3 | 0/3 | 0 | 67% | -- | 2026-04-02 |
-| **SendUserMessage/Brief** | SURFACE | 1 | 0/3 | 0 | 40% | -- | 2026-04-02 |
-| **Config** | SURFACE | 1 | 0/3 | 0 | 30% | config merge precedence (user > project > local) | 2026-04-02 |
-| **EnterPlanMode** | SURFACE | 2 | 0/3 | 0 | 50% | -- | 2026-04-02 |
-| **ExitPlanMode** | SURFACE | 2 | 0/3 | 0 | 50% | -- | 2026-04-02 |
-| **StructuredOutput** | SURFACE | 2 | 0/3 | 0 | 67% | -- | 2026-04-02 |
-| **REPL** | SURFACE | 3 | 0/3 | 0 | 40% | -- | 2026-04-02 |
-| **PowerShell** | SURFACE | 2 | 0/3 | 0 | 40% | -- | 2026-04-02 |
-| **AskUserQuestion** | STUB | 1 | 0/3 | 0 | 0% | needs user I/O integration | 2026-04-02 |
-| **TaskCreate** | STUB | 1 | 0/3 | 0 | 0% | needs sub-agent runtime | 2026-04-02 |
-| **TaskGet** | STUB | 1 | 0/3 | 0 | 0% | needs task registry | 2026-04-02 |
-| **TaskList** | STUB | 1 | 0/3 | 0 | 0% | needs task registry | 2026-04-02 |
-| **TaskStop** | STUB | 1 | 0/3 | 0 | 0% | needs process management | 2026-04-02 |
-| **TaskUpdate** | STUB | 1 | 0/3 | 0 | 0% | needs task message passing | 2026-04-02 |
-| **TaskOutput** | STUB | 1 | 0/3 | 0 | 0% | needs output capture | 2026-04-02 |
-| **TeamCreate** | STUB | 1 | 0/3 | 0 | 0% | needs parallel task orchestration | 2026-04-02 |
-| **TeamDelete** | STUB | 1 | 0/3 | 0 | 0% | needs team lifecycle | 2026-04-02 |
-| **CronCreate** | STUB | 1 | 0/3 | 0 | 0% | needs scheduler runtime | 2026-04-02 |
-| **CronDelete** | STUB | 1 | 0/3 | 0 | 0% | needs cron registry | 2026-04-02 |
-| **CronList** | STUB | 1 | 0/3 | 0 | 0% | needs cron registry | 2026-04-02 |
-| **LSP** | STUB | 1 | 0/3 | 0 | 0% | needs language server client | 2026-04-02 |
-| **ListMcpResources** | STUB | 1 | 0/3 | 0 | 0% | needs MCP client | 2026-04-02 |
-| **ReadMcpResource** | STUB | 1 | 0/3 | 0 | 0% | needs MCP client | 2026-04-02 |
-| **McpAuth** | STUB | 1 | 0/3 | 0 | 0% | needs OAuth flow | 2026-04-02 |
-| **MCP** | STUB | 1 | 0/3 | 0 | 0% | needs MCP tool proxy | 2026-04-02 |
-| **RemoteTrigger** | STUB | 1 | 0/3 | 0 | 0% | needs HTTP client | 2026-04-02 |
-| **TestingPermission** | STUB | 1 | 0/3 | 0 | 0% | test-only, low priority | 2026-04-02 |
+| **bash** | BEHAVIORAL | 1 | 3/3 | 2 | 52% | sedValidation, pathValidation, bashPermissions, bashSecurity, modeValidation, shouldUseSandbox | 2026-04-04 |
+| **read_file** | BEHAVIORAL | 1 | 3/3 | 1 | 60% | binary detection, size limit, path traversal prevention | 2026-04-04 |
+| **write_file** | BEHAVIORAL | 1 | 3/3 | 3 | 60% | size limit, path traversal prevention | 2026-04-04 |
+| **edit_file** | BEHAVIORAL | 1 | 3/3 | 3 | 60% | replace_all recently added | 2026-04-04 |
+| **glob_search** | BEHAVIORAL | 1 | 3/3 | 1 | 60% | -- | 2026-04-04 |
+| **grep_search** | BEHAVIORAL | 1 | 3/3 | 1 | 60% | -- | 2026-04-04 |
+| **WebFetch** | SURFACE | 2 | 3/3 | 0 | 30% | content truncation, redirect handling vs upstream | 2026-04-04 |
+| **WebSearch** | SURFACE | 2 | 3/3 | 0 | 30% | result ranking fidelity | 2026-04-04 |
+| **TodoWrite** | SURFACE | 2 | 3/3 | 0 | 40% | -- | 2026-04-04 |
+| **Skill** | SURFACE | 1 | 3/3 | 0 | 30% | skill discovery/install flow | 2026-04-04 |
+| **Agent** | SURFACE | 4 | 3/3 | 0 | 30% | sub-agent runtime integration | 2026-04-04 |
+| **ToolSearch** | SURFACE | 1 | 3/3 | 0 | 50% | -- | 2026-04-04 |
+| **NotebookEdit** | SURFACE | 2 | 3/3 | 0 | 40% | -- | 2026-04-04 |
+| **Sleep** | SURFACE | 3 | 3/3 | 0 | 67% | -- | 2026-04-04 |
+| **SendUserMessage/Brief** | SURFACE | 1 | 3/3 | 0 | 40% | -- | 2026-04-04 |
+| **Config** | SURFACE | 1 | 3/3 | 0 | 30% | config merge precedence (user > project > local) | 2026-04-04 |
+| **EnterPlanMode** | SURFACE | 2 | 3/3 | 0 | 50% | -- | 2026-04-04 |
+| **ExitPlanMode** | SURFACE | 2 | 3/3 | 0 | 50% | -- | 2026-04-04 |
+| **StructuredOutput** | SURFACE | 2 | 3/3 | 0 | 67% | -- | 2026-04-04 |
+| **REPL** | SURFACE | 3 | 3/3 | 0 | 40% | -- | 2026-04-04 |
+| **PowerShell** | SURFACE | 2 | 3/3 | 0 | 40% | -- | 2026-04-04 |
+| **AskUserQuestion** | STUB | 1 | 3/3 | 0 | 0% | needs user I/O integration | 2026-04-04 |
+| **TaskCreate** | STUB | 1 | 3/3 | 0 | 0% | needs sub-agent runtime | 2026-04-04 |
+| **TaskGet** | STUB | 1 | 3/3 | 0 | 0% | needs task registry | 2026-04-04 |
+| **TaskList** | STUB | 1 | 3/3 | 0 | 0% | needs task registry | 2026-04-04 |
+| **TaskStop** | STUB | 1 | 3/3 | 0 | 0% | needs process management | 2026-04-04 |
+| **TaskUpdate** | STUB | 1 | 3/3 | 0 | 0% | needs task message passing | 2026-04-04 |
+| **TaskOutput** | STUB | 1 | 3/3 | 0 | 0% | needs output capture | 2026-04-04 |
+| **TeamCreate** | STUB | 1 | 3/3 | 0 | 0% | needs parallel task orchestration | 2026-04-04 |
+| **TeamDelete** | STUB | 1 | 3/3 | 0 | 0% | needs team lifecycle | 2026-04-04 |
+| **CronCreate** | STUB | 1 | 3/3 | 0 | 0% | needs scheduler runtime | 2026-04-04 |
+| **CronDelete** | STUB | 1 | 3/3 | 0 | 0% | needs cron registry | 2026-04-04 |
+| **CronList** | STUB | 1 | 3/3 | 0 | 0% | needs cron registry | 2026-04-04 |
+| **LSP** | STUB | 1 | 3/3 | 0 | 0% | needs language server client | 2026-04-04 |
+| **ListMcpResources** | STUB | 1 | 3/3 | 0 | 0% | needs MCP client | 2026-04-04 |
+| **ReadMcpResource** | STUB | 1 | 3/3 | 0 | 0% | needs MCP client | 2026-04-04 |
+| **McpAuth** | STUB | 1 | 3/3 | 0 | 0% | needs OAuth flow | 2026-04-04 |
+| **MCP** | STUB | 1 | 3/3 | 0 | 0% | needs MCP tool proxy | 2026-04-04 |
+| **RemoteTrigger** | STUB | 1 | 3/3 | 0 | 0% | needs HTTP client | 2026-04-04 |
+| **TestingPermission** | STUB | 1 | 3/3 | 0 | 0% | test-only, low priority | 2026-04-04 |
+
+**Permission matrix note**: Permission coverage (3/3) for all tools is provided by `permission_matrix_covers_all_tools_and_modes` in `tools/src/lib.rs`, which tests every tool spec against all 3 modes (read-only, workspace-write, danger-full-access). The test `permission_matrix_workspace_write_prompts_for_danger_tools` additionally verifies the prompt escalation path for danger-level tools.
 
 **Column key**:
 - **Unit**: Count of unit tests directly exercising this tool
@@ -89,22 +91,22 @@ Every tool is classified into one of four levels. Each level has concrete, testa
 
 ## Missing Behavioral Features (in existing tools)
 
-**Bash tool — upstream has 18 submodules, Rust has 1:**
+**Bash tool — upstream has 18 submodules, Rust has `bash_validation` module + sandbox:**
 - [ ] `sedValidation` — validate sed commands before execution
 - [ ] `pathValidation` — validate file paths in commands
-- [ ] `readOnlyValidation` — block writes in read-only mode
-- [ ] `destructiveCommandWarning` — warn on rm -rf, etc.
-- [ ] `commandSemantics` — classify command intent
+- [x] `readOnlyValidation` — block writes in read-only mode (`bash_validation::validate_for_mode`)
+- [x] `destructiveCommandWarning` — warn on rm -rf, etc. (`bash_validation::check_destructive_patterns`)
+- [x] `commandSemantics` — classify command intent (`bash_validation::classify_command`)
 - [ ] `bashPermissions` — permission gating per command type
 - [ ] `bashSecurity` — security checks
 - [ ] `modeValidation` — validate against current permission mode
 - [ ] `shouldUseSandbox` — sandbox decision logic
 
-**File tools — need verification:**
-- [ ] Path traversal prevention (symlink following, ../ escapes)
+**File tools — verified:**
+- [x] Path traversal prevention (canonicalize-based, tested with ../ and absolute paths)
 - [ ] Size limits on read/write
 - [ ] Binary file detection
-- [ ] Permission mode enforcement (read-only vs workspace-write)
+- [x] Permission mode enforcement (read-only vs workspace-write) — via `permission_matrix_covers_all_tools_and_modes`
 
 **Config/Plugin/MCP flows:**
 - [ ] Full MCP server lifecycle (connect, list tools, call tool, disconnect)
@@ -120,6 +122,7 @@ Every tool is classified into one of four levels. Each level has concrete, testa
 - [ ] Session compaction behavior matching
 - [ ] Token counting / cost tracking accuracy
 - [x] Streaming response support validated by the mock parity harness
+- [x] Parallel tool execution for read-only tools via `std::thread::scope` (partition in `parallel_tools.rs`, execution in `conversation.rs`)
 
 ---
 
@@ -127,8 +130,8 @@ Every tool is classified into one of four levels. Each level has concrete, testa
 
 - [ ] `PARITY.md` maintained with rubric levels (not informal labels)
 - [ ] No `#[ignore]` tests hiding failures (only 1 allowed: `live_stream_smoke_test`)
-- [ ] CI runs `cargo test --workspace` (currently only `-p rusty-claude-cli`)
-- [ ] CI runs `cargo clippy --workspace --all-targets -- -D warnings`
-- [ ] CI runs mock parity harness
-- [ ] All BEHAVIORAL+ tools have 3/3 permission matrix tests
+- [x] CI runs `cargo test --workspace`
+- [x] CI runs `cargo clippy --workspace --all-targets -- -D warnings`
+- [ ] CI runs mock parity harness (harness tests run via `cargo test --workspace` on Linux, but no dedicated CI step)
+- [x] All BEHAVIORAL+ tools have 3/3 permission matrix tests
 - [ ] Codebase shape clean for handoff

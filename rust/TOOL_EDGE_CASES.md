@@ -22,18 +22,18 @@ Each tool's checklist enumerates the behaviors that must be tested for that tool
 **Upstream validation submodules:**
 - [ ] `sedValidation` — validate sed commands before execution
 - [ ] `pathValidation` — validate file paths in commands
-- [ ] `readOnlyValidation` — block writes in read-only permission mode
-- [ ] `destructiveCommandWarning` — warn on rm -rf, git reset --hard, etc.
-- [ ] `commandSemantics` — classify command intent (read vs write vs destructive)
+- [x] `readOnlyValidation` — block writes in read-only permission mode (bash_validation::validate_for_mode)
+- [x] `destructiveCommandWarning` — warn on rm -rf, git reset --hard, etc. (bash_validation::check_destructive_patterns)
+- [x] `commandSemantics` — classify command intent (read vs write vs destructive) (bash_validation::classify_command)
 - [ ] `bashPermissions` — permission gating per command type
 - [ ] `bashSecurity` — injection and escape sequence checks
 - [ ] `modeValidation` — validate against current permission mode
 - [ ] `shouldUseSandbox` — sandbox decision logic based on env/config
 
 **Permission matrix:**
-- [ ] allowed in danger-full-access mode
-- [ ] denied in read-only mode (for write commands)
-- [ ] behavior in workspace-write mode matches upstream
+- [x] allowed in danger-full-access mode (permission_matrix_covers_all_tools_and_modes)
+- [x] denied in read-only mode (for write commands) (permission_matrix_covers_all_tools_and_modes)
+- [x] behavior in workspace-write mode matches upstream (permission_matrix_workspace_write_prompts_for_danger_tools)
 
 **Adversarial:**
 - [ ] command injection via shell metacharacters
@@ -55,12 +55,12 @@ Each tool's checklist enumerates the behaviors that must be tested for that tool
 - [ ] read with offset=0 equivalent to no offset
 
 **Safety:**
-- [ ] path traversal via ../ prevented
+- [x] path traversal via ../ prevented (canonicalize in normalize_path)
 - [ ] symlink following behavior matches upstream
-- [ ] absolute vs relative path handling
+- [x] absolute vs relative path handling
 
 **Permission matrix:**
-- [ ] allowed in read-only mode
+- [x] allowed in read-only mode (permission_matrix_covers_all_tools_and_modes)
 - [x] exercised in E2E harness (read_file_roundtrip)
 
 ---
@@ -71,17 +71,17 @@ Each tool's checklist enumerates the behaviors that must be tested for that tool
 - [x] create new file in new directory
 - [x] overwrite existing file (returns original content)
 - [ ] write empty content creates empty file
-- [ ] write to path with non-existent deep directory creates parents
+- [x] write to path with non-existent deep directory creates parents
 
 **Safety:**
-- [ ] path traversal via ../ prevented
+- [x] path traversal via ../ prevented (canonicalize in normalize_path_allow_missing)
 - [ ] symlink following behavior matches upstream
 - [ ] size limit enforcement on content
 
 **Permission matrix:**
 - [x] allowed in workspace-write mode (E2E: write_file_allowed)
 - [x] denied in read-only mode (E2E: write_file_denied)
-- [ ] behavior in danger-full-access mode
+- [x] behavior in danger-full-access mode (permission_matrix_covers_all_tools_and_modes)
 
 ---
 
@@ -92,16 +92,16 @@ Each tool's checklist enumerates the behaviors that must be tested for that tool
 - [x] replace_all replaces every occurrence
 - [x] identical old/new string returns error
 - [x] old_string not found returns error
-- [ ] edit on non-existent file returns error
+- [x] edit on non-existent file returns error
 - [ ] old_string not unique (without replace_all) returns error
 - [ ] edit preserving file permissions/mode
 
 **Safety:**
-- [ ] path traversal via ../ prevented
+- [x] path traversal via ../ prevented (canonicalize in normalize_path)
 
 **Permission matrix:**
-- [ ] allowed in workspace-write mode
-- [ ] denied in read-only mode
+- [x] allowed in workspace-write mode (permission_matrix_covers_all_tools_and_modes)
+- [x] denied in read-only mode (permission_matrix_covers_all_tools_and_modes)
 
 ---
 
@@ -118,7 +118,7 @@ Each tool's checklist enumerates the behaviors that must be tested for that tool
 - [ ] glob in restricted directory handled
 
 **Permission matrix:**
-- [ ] allowed in read-only mode
+- [x] allowed in read-only mode (permission_matrix_covers_all_tools_and_modes)
 - [ ] denied outside workspace boundary (if applicable)
 
 ---
@@ -137,7 +137,7 @@ Each tool's checklist enumerates the behaviors that must be tested for that tool
 - [ ] glob filter works with grep
 
 **Permission matrix:**
-- [ ] allowed in read-only mode
+- [x] allowed in read-only mode (permission_matrix_covers_all_tools_and_modes)
 - [x] exercised in E2E harness (grep_chunk_assembly)
 
 ---
@@ -302,6 +302,20 @@ Each tool's checklist enumerates the behaviors that must be tested for that tool
 - [x] background execution returns task ID
 - [x] missing shell executable returns error
 - [ ] timeout enforcement
+
+---
+
+## Output Truncation Thresholds
+
+All tool output is subject to a global truncation limit of **100,000 bytes** (`MAX_TOOL_OUTPUT_BYTES` in `tools/src/lib.rs`). Individual tools may apply tighter limits:
+
+| Tool | Limit | Location |
+|------|-------|----------|
+| All tools | 100KB output | `execute_tool` wrapper |
+| glob_search | 100 files | `file_ops.rs:248` |
+| grep_search | 250 lines default (configurable) | `file_ops.rs:416` |
+| ToolSearch | 8 results | `lib.rs` |
+| bash | No individual limit (global 100KB applies) | -- |
 
 ---
 

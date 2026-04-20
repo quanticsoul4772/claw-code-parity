@@ -4939,7 +4939,7 @@ fn prompt_cache_record_to_runtime_event(
 }
 
 struct CliToolExecutor {
-    renderer: TerminalRenderer,
+    renderer: std::sync::Mutex<TerminalRenderer>,
     emit_output: bool,
     allowed_tools: Option<AllowedToolSet>,
     tool_registry: GlobalToolRegistry,
@@ -4952,7 +4952,7 @@ impl CliToolExecutor {
         tool_registry: GlobalToolRegistry,
     ) -> Self {
         Self {
-            renderer: TerminalRenderer::new(),
+            renderer: std::sync::Mutex::new(TerminalRenderer::new()),
             emit_output,
             allowed_tools,
             tool_registry,
@@ -4961,7 +4961,7 @@ impl CliToolExecutor {
 }
 
 impl ToolExecutor for CliToolExecutor {
-    fn execute(&mut self, tool_name: &str, input: &str) -> Result<String, ToolError> {
+    fn execute(&self, tool_name: &str, input: &str) -> Result<String, ToolError> {
         if self
             .allowed_tools
             .as_ref()
@@ -4978,6 +4978,8 @@ impl ToolExecutor for CliToolExecutor {
                 if self.emit_output {
                     let markdown = format_tool_result(tool_name, &output, false);
                     self.renderer
+                        .lock()
+                        .expect("renderer lock should not be poisoned")
                         .stream_markdown(&markdown, &mut io::stdout())
                         .map_err(|error| ToolError::new(error.to_string()))?;
                 }
@@ -4988,6 +4990,8 @@ impl ToolExecutor for CliToolExecutor {
                 if self.emit_output {
                     let markdown = format_tool_result(tool_name, &error_message, true);
                     self.renderer
+                        .lock()
+                        .expect("renderer lock should not be poisoned")
                         .stream_markdown(&markdown, &mut io::stdout())
                         .map_err(|stream_error| ToolError::new(stream_error.to_string()))?;
                 }

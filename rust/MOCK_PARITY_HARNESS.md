@@ -17,6 +17,15 @@ The harness runs these scripted scenarios against a fresh workspace and isolated
 3. `grep_chunk_assembly`
 4. `write_file_allowed`
 5. `write_file_denied`
+6. `edit_file_roundtrip`
+7. `bash_timeout`
+8. `hook_pre_tool_deny` (Unix only — hook deny not yet enforced)
+9. `glob_search_readonly` — glob_search succeeds in read-only mode
+10. `edit_file_denied_readonly` — edit_file blocked in read-only mode
+11. `bash_denied_readonly` — bash blocked in read-only mode
+12. `read_file_not_found` — nonexistent file returns error
+13. `edit_file_old_string_missing` — wrong old_string returns error
+14. `write_file_overwrite` — overwrite existing file, verify original returned
 
 ## Run
 

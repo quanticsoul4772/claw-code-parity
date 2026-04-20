@@ -8,12 +8,15 @@ mod mcp;
 mod mcp_client;
 mod mcp_stdio;
 mod oauth;
+pub mod parallel_tools;
 mod permissions;
+pub mod progress_tracker;
 mod prompt;
 mod remote;
 pub mod sandbox;
 mod session;
 mod sse;
+pub mod tool_budget;
 mod usage;
 
 pub use bootstrap::{BootstrapPhase, BootstrapPlan};

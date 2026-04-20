@@ -20,9 +20,8 @@ impl fmt::Display for ToolExecutionError {
         match self {
             Self::Io(error) => write!(f, "{error}"),
             Self::Json(error) => write!(f, "{error}"),
-            Self::Validation(message) => write!(f, "{message}"),
+            Self::Validation(message) | Self::External(message) => write!(f, "{message}"),
             Self::ToolNotFound(name) => write!(f, "unsupported tool: {name}"),
-            Self::External(message) => write!(f, "{message}"),
         }
     }
 }
